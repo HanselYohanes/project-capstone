@@ -4,10 +4,16 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App.jsx'
 import './index.css'
 
+// 🔥 TAMBAHAN
+import { MapProvider } from "./context/MapContext";
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
-      <App />
+      {/* 🔥 WRAP DI SINI */}
+      <MapProvider>
+        <App />
+      </MapProvider>
     </BrowserRouter>
   </React.StrictMode>,
 )
