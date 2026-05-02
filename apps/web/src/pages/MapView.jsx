@@ -1,11 +1,23 @@
-// import React, { useState, useMemo } from 'react';
-// import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
-// // ❌ cluster dimatikan sementara
-// // import MarkerClusterGroup from "react-leaflet-cluster";
+// import React, { useState, useMemo, useEffect } from 'react';
+// import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 // import 'leaflet/dist/leaflet.css';
 // import L, { Icon } from 'leaflet';
 // import { useLocations } from "../hooks/useLocations";
-// import { useMap } from "../context/MapContext";
+// import { useMap as useMapContext } from "../context/MapContext";
+// import { useLocation } from "react-router-dom";
+
+// // 🔥 MAP CONTROLLER (AUTO FOCUS)
+// const MapController = ({ lat, lng }) => {
+//   const map = useMap();
+
+//   useEffect(() => {
+//     if (!isNaN(lat) && !isNaN(lng)) {
+//       map.setView([lat, lng], 16);
+//     }
+//   }, [lat, lng, map]);
+
+//   return null;
+// };
 
 // // 🔥 FIX ICON
 // delete L.Icon.Default.prototype._getIconUrl;
@@ -24,6 +36,12 @@
 // const redIcon = new Icon({
 //   iconUrl: 'https://maps.google.com/mapfiles/ms/icons/red-dot.png',
 //   iconSize: [25, 41],
+// });
+
+// const orangeIcon = new L.Icon({
+//   iconUrl: "https://maps.google.com/mapfiles/ms/icons/orange-dot.png",
+//   iconSize: [25, 41],
+//   iconAnchor: [12, 41]
 // });
 
 // // 🔥 DISTANCE
@@ -53,7 +71,7 @@
 //   });
 // };
 
-// // 🔥 CLUSTER LOGIC
+// // 🔥 CLUSTER
 // const getClusterLevel = (target, all) => {
 //   let count = 0;
 
@@ -73,9 +91,7 @@
 //   let violations = 0;
 
 //   locations.forEach(loc => {
-//     if (loc.isViolation) {
-//       violations++;
-//     }
+//     if (loc.isViolation) violations++;
 //   });
 
 //   return {
@@ -88,22 +104,23 @@
 // const MapView = () => {
 
 //   const locations = useLocations() || [];
+//   const { setSelectedLocation } = useMapContext();
+
+//   // 🔥 AMBIL PARAM URL
+//   const location = useLocation();
+//   const query = new URLSearchParams(location.search);
+//   const lat = parseFloat(query.get("lat"));
+//   const lng = parseFloat(query.get("lng"));
 
 //   const [search, setSearch] = useState("");
 //   const [filter, setFilter] = useState("all");
 //   const [showRadius, setShowRadius] = useState(false);
-
-//   // 🔥 NEW (Predict AI)
 //   const [isPredictActive, setIsPredictActive] = useState(false);
 
-//   const { setSelectedLocation } = useMap();
-
-//   // 🔥 CLICK HANDLER
 //   const handlePredict = () => {
 //     setIsPredictActive(prev => !prev);
 //   };
 
-//   // 🔥 PREPROCESS
 //   const processedLocations = useMemo(() => {
 //     return locations.map(loc => {
 
@@ -111,18 +128,23 @@
 //         return {
 //           ...loc,
 //           isViolation: false,
-//           cluster: "low"
+//           cluster: "low",
+//           predicted: false
 //         };
 //       }
 
+//       const isViolation =
+//         loc.type === "zonasi"
+//           ? loc.violation
+//           : checkViolation(loc, locations);
+
+//       const cluster = getClusterLevel(loc, locations);
+
 //       return {
 //         ...loc,
-//         isViolation:
-//           loc.type === "zonasi"
-//             ? loc.violation
-//             : checkViolation(loc, locations),
-
-//         cluster: getClusterLevel(loc, locations)
+//         isViolation,
+//         cluster,
+//         predicted: cluster === "high" && !isViolation
 //       };
 //     });
 //   }, [locations]);
@@ -146,53 +168,14 @@
 //   return (
 //     <div className="h-screen w-full">
 
-//       {/* 🔥 PREDICT BUTTON */}
-//       <button
-//         onClick={handlePredict}
-//         style={{
-//           position: "absolute",
-//           top: "200px", // 🔥 lebih kebawah (sebelumnya 140px)
-//           right: "20px",
-//           zIndex: 1000,
-//           padding: "10px 16px",
-//           background: isPredictActive ? "#22c55e" : "#7c3aed",
-//           color: "white",
-//           border: "none",
-//           borderRadius: "8px",
-//           cursor: "pointer",
-//           fontWeight: "bold",
-//           boxShadow: "0 4px 12px rgba(0,0,0,0.2)" // 🔥 biar lebih "keangkat"
-//         }}
-//       >
-//         {isPredictActive ? "AI ON" : "Predict AI"}
-//       </button>
-//       {/* 🔥 INDICATOR */}
-//       {isPredictActive && (
-//         <div
-//           style={{
-//             position: "absolute",
-//             bottom: "20px",
-//             left: "20px",
-//             zIndex: 1000,
-//             background: "#22c55e",
-//             color: "white",
-//             padding: "8px 12px",
-//             borderRadius: "6px",
-//             fontSize: "12px"
-//           }}
-//         >
-//           AI Prediction Active
-//         </div>
-//       )}
-
-//       {/* SEARCH */}
+//       {/* 🔥 SEARCH */}
 //       <input
 //         placeholder="Cari lokasi..."
 //         onChange={(e) => setSearch(e.target.value)}
 //         className="absolute top-4 right-4 z-[1000] p-2 rounded"
 //       />
 
-//       {/* FILTER */}
+//       {/* 🔥 FILTER */}
 //       <div className="absolute top-16 right-4 z-[1000] bg-white p-2 rounded shadow">
 //         <select onChange={(e) => setFilter(e.target.value)}>
 //           <option value="all">All</option>
@@ -203,35 +186,19 @@
 //         </select>
 //       </div>
 
-//       {/* TOGGLE */}
-//       <div className="absolute top-28 right-4 z-[1000] bg-white p-2 rounded shadow">
-//         <button
-//           onClick={() => setShowRadius(prev => !prev)}
-//           className="text-sm px-3 py-1 bg-purple-600 text-white rounded"
-//         >
-//           {showRadius ? "Hide Radius" : "Show Radius"}
-//         </button>
-//       </div>
-
-//       {/* STATS */}
-//       <div className="absolute top-4 left-4 z-[1000] bg-black text-white p-3 rounded">
-//         <div>Total: {stats.total}</div>
-//         <div>Violation: {stats.violations}</div>
-//         <div>Safe: {stats.safe}</div>
-//       </div>
-
-//       {/* MAP */}
+//       {/* 🔥 MAP */}
 //       <MapContainer
 //         center={[-6.2, 106.8]}
 //         zoom={13}
 //         preferCanvas={true}
 //         style={{ height: "100%", width: "100%" }}
 //       >
+//         {/* 🔥 AUTO FOCUS */}
+//         <MapController lat={lat} lng={lng} />
+
 //         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-//         {/* MARKER */}
 //         {finalLocations.map((item) => {
-
 //           if (isNaN(item.lat) || isNaN(item.lng)) return null;
 
 //           return (
@@ -241,68 +208,49 @@
 //               icon={
 //                 item.type === "pasar"
 //                   ? blueIcon
-//                   : item.cluster === "high"
+//                   : item.isViolation
 //                     ? redIcon
-//                     : item.cluster === "medium"
-//                       ? redIcon
-//                       : item.isViolation
-//                         ? redIcon
-//                         : blueIcon
+//                     : isPredictActive && item.predicted
+//                       ? orangeIcon
+//                       : blueIcon
 //               }
 //               eventHandlers={{
 //                 click: () => setSelectedLocation(item)
 //               }}
 //             >
 //               <Popup>
-//                 <b>{item.nama}</b><br />
-
-//                 {item.type === "zonasi" && (
-//                   <>
-//                     Jarak: {Math.round(item.jarak)} m<br />
-//                     Pasar: {item.pasarTerdekat}<br />
-//                   </>
-//                 )}
-
-//                 <b style={{ color: item.isViolation ? 'red' : 'green' }}>
-//                   {item.isViolation ? 'VIOLATION (<500m)' : 'SAFE'}
-//                 </b>
-
-//                 <br />
-//                 Cluster: <b>{item.cluster}</b>
+//                 <b>{item.nama}</b>
 //               </Popup>
 //             </Marker>
 //           );
 //         })}
-
-//         {/* CIRCLE */}
-//         {showRadius && finalLocations.map((item, index) => {
-//           if (isNaN(item.lat) || isNaN(item.lng)) return null;
-
-//           return (
-//             <Circle
-//               key={`circle-${index}`}
-//               center={[item.lat, item.lng]}
-//               radius={500}
-//               pathOptions={{
-//                 color: item.type === "pasar" ? "blue" : "red",
-//                 fillOpacity: 0.05
-//               }}
-//             />
-//           );
-//         })}
-
 //       </MapContainer>
 //     </div>
 //   );
 // };
 
 // export default MapView;
-import React, { useState, useMemo } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
+
+import React, { useState, useMemo, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L, { Icon } from 'leaflet';
 import { useLocations } from "../hooks/useLocations";
-import { useMap } from "../context/MapContext";
+import { useMap as useMapContext } from "../context/MapContext";
+import { useLocation } from "react-router-dom";
+
+// 🔥 MAP CONTROLLER (AUTO FOCUS)
+const MapController = ({ lat, lng }) => {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!isNaN(lat) && !isNaN(lng)) {
+      map.setView([lat, lng], 16);
+    }
+  }, [lat, lng, map]);
+
+  return null;
+};
 
 // 🔥 FIX ICON
 delete L.Icon.Default.prototype._getIconUrl;
@@ -323,11 +271,16 @@ const redIcon = new Icon({
   iconSize: [25, 41],
 });
 
-// 🔥 ORANGE (PREDICT)
 const orangeIcon = new L.Icon({
   iconUrl: "https://maps.google.com/mapfiles/ms/icons/orange-dot.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41]
+});
+
+// 🔥 NEW ICON (SELECTED)
+const greenIcon = new L.Icon({
+  iconUrl: "https://maps.google.com/mapfiles/ms/icons/green-dot.png",
+  iconSize: [25, 41],
 });
 
 // 🔥 DISTANCE
@@ -372,37 +325,27 @@ const getClusterLevel = (target, all) => {
   return "low";
 };
 
-// 🔥 STATS
-const getStats = (locations = []) => {
-  let violations = 0;
-
-  locations.forEach(loc => {
-    if (loc.isViolation) violations++;
-  });
-
-  return {
-    total: locations.length,
-    violations,
-    safe: locations.length - violations
-  };
-};
-
 const MapView = () => {
 
   const locations = useLocations() || [];
+  const { setSelectedLocation } = useMapContext();
 
+  // 🔥 URL PARAM
+  const location = useLocation();
+  const query = new URLSearchParams(location.search);
+  const lat = parseFloat(query.get("lat"));
+  const lng = parseFloat(query.get("lng"));
+
+  // 🔥 STATE
+  const [selectedId, setSelectedId] = useState(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
-  const [showRadius, setShowRadius] = useState(false);
   const [isPredictActive, setIsPredictActive] = useState(false);
-
-  const { setSelectedLocation } = useMap();
 
   const handlePredict = () => {
     setIsPredictActive(prev => !prev);
   };
 
-  // 🔥 PREPROCESS + AI
   const processedLocations = useMemo(() => {
     return locations.map(loc => {
 
@@ -431,89 +374,21 @@ const MapView = () => {
     });
   }, [locations]);
 
-  const filteredLocations = processedLocations.filter(loc =>
-    (loc?.nama || "").toLowerCase().includes(search.toLowerCase())
-  );
-
-  const finalLocations = filteredLocations
-    .filter(loc => {
-      if (filter === "violation") return loc.isViolation;
-      if (filter === "safe") return !loc.isViolation;
-      if (filter === "retail") return loc.type === "retail";
-      if (filter === "pasar") return loc.type === "pasar";
-      return true;
-    })
-    .slice(0, 200);
-
-  const stats = getStats(finalLocations);
+  const finalLocations = processedLocations;
 
   return (
     <div className="h-screen w-full">
 
-      {/* 🔥 SEARCH */}
-      <input
-        placeholder="Cari lokasi..."
-        onChange={(e) => setSearch(e.target.value)}
-        className="absolute top-4 right-4 z-[1000] p-2 rounded"
-      />
-
-      {/* 🔥 FILTER */}
-      <div className="absolute top-16 right-4 z-[1000] bg-white p-2 rounded shadow">
-        <select onChange={(e) => setFilter(e.target.value)}>
-          <option value="all">All</option>
-          <option value="violation">Violation</option>
-          <option value="safe">Safe</option>
-          <option value="retail">Retail</option>
-          <option value="pasar">Pasar</option>
-        </select>
-      </div>
-
-      {/* 🔥 TOGGLE RADIUS */}
-      <div className="absolute top-28 right-4 z-[1000] bg-white p-2 rounded shadow">
-        <button
-          onClick={() => setShowRadius(prev => !prev)}
-          className="text-sm px-3 py-1 bg-purple-600 text-white rounded"
-        >
-          {showRadius ? "Hide Radius" : "Show Radius"}
-        </button>
-      </div>
-
-      {/* 🔥 PREDICT BUTTON */}
-      <button
-        onClick={handlePredict}
-        style={{
-          position: "absolute",
-          top: "200px",
-          right: "20px",
-          zIndex: 1000,
-          padding: "10px 16px",
-          background: isPredictActive ? "#22c55e" : "#7c3aed",
-          color: "white",
-          border: "none",
-          borderRadius: "8px",
-          fontWeight: "bold"
-        }}
-      >
-        {isPredictActive ? "AI ON" : "Predict AI"}
-      </button>
-
-      {/* 🔥 STATS */}
-      <div className="absolute top-4 left-4 z-[1000] bg-black text-white p-3 rounded">
-        <div>Total: {stats.total}</div>
-        <div>Violation: {stats.violations}</div>
-        <div>Safe: {stats.safe}</div>
-      </div>
-
-      {/* 🔥 MAP */}
       <MapContainer
         center={[-6.2, 106.8]}
         zoom={13}
-        preferCanvas={true}
         style={{ height: "100%", width: "100%" }}
       >
+        {/* 🔥 AUTO FOCUS */}
+        <MapController lat={lat} lng={lng} />
+
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-        {/* MARKER */}
         {finalLocations.map((item) => {
           if (isNaN(item.lat) || isNaN(item.lng)) return null;
 
@@ -522,58 +397,36 @@ const MapView = () => {
               key={item.id}
               position={[item.lat, item.lng]}
               icon={
-                item.type === "pasar"
-                  ? blueIcon
-                  : item.isViolation
-                    ? redIcon
-                    : isPredictActive && item.predicted
-                      ? orangeIcon
-                      : blueIcon
+                item.id === selectedId
+                  ? greenIcon
+                  : item.type === "pasar"
+                    ? blueIcon
+                    : item.isViolation
+                      ? redIcon
+                      : isPredictActive && item.predicted
+                        ? orangeIcon
+                        : blueIcon
               }
               eventHandlers={{
-                click: () => setSelectedLocation(item)
+                click: () => {
+                  setSelectedLocation(item);
+                  setSelectedId(item.id);
+                }
               }}
             >
               <Popup>
-                <b>{item.nama}</b><br />
+                <b>{item.nama}</b>
 
-                <b style={{ color: item.isViolation ? 'red' : 'green' }}>
-                  {item.isViolation ? 'VIOLATION (<500m)' : 'SAFE'}
-                </b>
-
-                {isPredictActive && item.predicted && (
+                {item.id === selectedId && (
                   <>
                     <br />
-                    <b style={{ color: "orange" }}>
-                      POTENTIAL VIOLATION
-                    </b>
+                    <b style={{ color: "green" }}>SELECTED</b>
                   </>
                 )}
-
-                <br />
-                Cluster: <b>{item.cluster}</b>
               </Popup>
             </Marker>
           );
         })}
-
-        {/* 🔥 CIRCLE */}
-        {showRadius && finalLocations.map((item, index) => {
-          if (isNaN(item.lat) || isNaN(item.lng)) return null;
-
-          return (
-            <Circle
-              key={`circle-${index}`}
-              center={[item.lat, item.lng]}
-              radius={500}
-              pathOptions={{
-                color: item.type === "pasar" ? "blue" : "red",
-                fillOpacity: 0.05
-              }}
-            />
-          );
-        })}
-
       </MapContainer>
     </div>
   );

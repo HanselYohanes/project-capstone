@@ -1,5 +1,6 @@
 // import React, { useMemo, useState, useEffect } from "react";
 // import { useLocations } from "../hooks/useLocations";
+// import { useNavigate } from "react-router-dom";
 
 // // 🔥 logic dari MapView
 // const getDistance = (lat1, lon1, lat2, lon2) => {
@@ -30,11 +31,13 @@
 // };
 
 // const ViolationsPage = () => {
-//     const rawLocations = useLocations() || [];
+//     const navigate = useNavigate(); // ✅ BENAR DI SINI
 
+//     const rawLocations = useLocations() || [];
 //     const [locations, setLocations] = useState([]);
 
-//     // 🔥 LOAD LOCAL STORAGE
+//     const [deletedItem, setDeletedItem] = useState(null);
+
 //     useEffect(() => {
 //         try {
 //             const saved = localStorage.getItem("locations");
@@ -44,14 +47,12 @@
 //         }
 //     }, []);
 
-//     // 🔥 FALLBACK DATA
 //     useEffect(() => {
 //         if (rawLocations.length > 0) {
 //             setLocations(prev => (prev.length === 0 ? rawLocations : prev));
 //         }
 //     }, [rawLocations]);
 
-//     // 🔥 SAVE LOCAL STORAGE
 //     useEffect(() => {
 //         if (locations.length > 0) {
 //             localStorage.setItem("locations", JSON.stringify(locations));
@@ -60,11 +61,8 @@
 
 //     const [search, setSearch] = useState("");
 //     const [showOnlyViolation, setShowOnlyViolation] = useState(false);
-
-//     // 🔥 NEW STATE (CONFIRM DELETE)
 //     const [deleteId, setDeleteId] = useState(null);
 
-//     // 🔥 EDIT STATUS
 //     const handleStatusChange = (id, newStatus) => {
 //         setLocations(prev =>
 //             prev.map((loc, i) =>
@@ -73,7 +71,6 @@
 //         );
 //     };
 
-//     // 🔥 EDIT LIMIT & SATURATION
 //     const handleFieldChange = (id, field, value) => {
 //         setLocations(prev =>
 //             prev.map((loc, i) =>
@@ -82,15 +79,31 @@
 //         );
 //     };
 
-//     // 🔥 DELETE DATA
 //     const handleDelete = (id) => {
 //         setLocations((prev) => {
+//             const itemToDelete = prev.find((_, i) => i === id);
 //             const updated = prev.filter((_, i) => i !== id);
+
+//             setDeletedItem(itemToDelete);
 
 //             localStorage.setItem("locations", JSON.stringify(updated));
 
 //             return updated;
 //         });
+//     };
+
+//     const handleUndo = () => {
+//         if (!deletedItem) return;
+
+//         setLocations((prev) => {
+//             const updated = [...prev, deletedItem];
+
+//             localStorage.setItem("locations", JSON.stringify(updated));
+
+//             return updated;
+//         });
+
+//         setDeletedItem(null);
 //     };
 
 //     const violations = useMemo(() => {
@@ -124,7 +137,9 @@
 //                     rule: "< 500m from Pasar",
 //                     limit,
 //                     saturation,
-//                     status
+//                     status,
+//                     lat: loc.lat, // ✅ TAMBAH INI
+//                     lng: loc.lng, // ✅ TAMBAH INI
 //                 };
 //             })
 //             .filter(Boolean);
@@ -142,6 +157,23 @@
 //         <div className="ml-64 p-8 text-white">
 //             <h1 className="text-2xl font-bold mb-6">All Violations</h1>
 
+//             {/* 🔥 KPI SUMMARY */}
+//             <div className="mb-4 flex gap-4">
+//                 <div>Critical: {violations.filter(v => v.status === "Critical").length}</div>
+//                 <div>Warning: {violations.filter(v => v.status === "Warning").length}</div>
+//                 <div>Safe: {violations.filter(v => v.status === "Safe").length}</div>
+//             </div>
+
+//             {/* 🔥 UNDO */}
+//             {deletedItem && (
+//                 <div className="mb-4 p-3 bg-yellow-500/20 text-yellow-300 rounded flex justify-between">
+//                     <span>Data dihapus</span>
+//                     <button onClick={handleUndo} className="bg-yellow-500 px-2 rounded text-black">
+//                         Undo
+//                     </button>
+//                 </div>
+//             )}
+
 //             <button
 //                 onClick={() => setShowOnlyViolation(prev => !prev)}
 //                 className="mb-4 px-4 py-2 bg-purple-600 rounded"
@@ -155,129 +187,99 @@
 //                 className="mb-4 p-2 rounded bg-[#1f2937] w-full"
 //             />
 
-//             <div className="bg-surface-container rounded-xl p-4">
-//                 <table className="w-full text-sm">
-//                     <thead className="text-left text-on-surface-variant">
-//                         <tr>
-//                             <th>ID</th>
-//                             <th>Entity</th>
-//                             <th>District</th>
-//                             <th>Rule</th>
-//                             <th>Limit</th>
-//                             <th>Saturation</th>
-//                             <th>Status</th>
-//                             <th>Edit</th>
-//                             <th>Delete</th>
+//             <table className="w-full text-sm">
+//                 <thead>
+//                     <tr>
+//                         <th>ID</th>
+//                         <th>Entity</th>
+//                         <th>District</th>
+//                         <th>Rule</th>
+//                         <th>Limit</th>
+//                         <th>Saturation</th>
+//                         <th>Status</th>
+//                         <th>Edit</th>
+//                         <th>Delete</th>
+//                     </tr>
+//                 </thead>
+
+//                 <tbody>
+//                     {filtered.map((item, i) => (
+//                         <tr
+//                             key={i}
+//                             className={item.status === "Critical" ? "bg-red-500/10 cursor-pointer" : "cursor-pointer"}
+//                             onClick={() => navigate(`/map?lat=${item.lat}&lng=${item.lng}`)}
+//                         >
+//                             <td>{item.code}</td>
+//                             <td>{item.name}</td>
+//                             <td>{item.district}</td>
+//                             <td>{item.rule}</td>
+
+//                             <td>
+//                                 <input
+//                                     type="number"
+//                                     value={item.limit}
+//                                     className="w-16 bg-gray-200 text-black rounded px-2"
+//                                     onChange={(e) =>
+//                                         handleFieldChange(item.id, "limit", Number(e.target.value))
+//                                     }
+//                                 />
+//                             </td>
+
+//                             <td>
+//                                 <input
+//                                     type="number"
+//                                     value={item.saturation}
+//                                     className="w-16 bg-gray-200 text-black rounded px-2"
+//                                     onChange={(e) =>
+//                                         handleFieldChange(item.id, "saturation", Number(e.target.value))
+//                                     }
+//                                 />
+//                             </td>
+
+//                             <td>{item.status}</td>
+
+//                             <td>
+//                                 <select
+//                                     value={item.status}
+//                                     className="bg-gray-200 text-black rounded px-2"
+//                                     onChange={(e) =>
+//                                         handleStatusChange(item.id, e.target.value)
+//                                     }
+//                                 >
+//                                     <option value="Critical">Critical</option>
+//                                     <option value="Resolved">Resolved</option>
+//                                 </select>
+//                             </td>
+
+//                             <td>
+//                                 <button onClick={(e) => {
+//                                     e.stopPropagation(); // 🔥 biar ga trigger map
+//                                     setDeleteId(item.id);
+//                                 }}>
+//                                     Delete
+//                                 </button>
+//                             </td>
 //                         </tr>
-//                     </thead>
+//                     ))}
+//                 </tbody>
+//             </table>
 
-//                     <tbody>
-//                         {filtered.map((item, i) => (
-//                             <tr key={i} className="border-t border-white/5">
-//                                 <td>{item.code}</td>
-//                                 <td>{item.name}</td>
-//                                 <td>{item.district}</td>
-//                                 <td>{item.rule}</td>
+//             {filtered.length === 0 && <div>Tidak ada data</div>}
 
-//                                 <td>
-//                                     <input
-//                                         type="number"
-//                                         value={item.limit}
-//                                         className="w-16 bg-[#1f2937] rounded px-2"
-//                                         onChange={(e) =>
-//                                             handleFieldChange(item.id, "limit", Number(e.target.value))
-//                                         }
-//                                     />
-//                                 </td>
-
-//                                 <td>
-//                                     <input
-//                                         type="number"
-//                                         value={item.saturation}
-//                                         className="w-16 bg-[#1f2937] rounded px-2"
-//                                         onChange={(e) =>
-//                                             handleFieldChange(item.id, "saturation", Number(e.target.value))
-//                                         }
-//                                     />
-//                                 </td>
-
-//                                 <td>
-//                                     <span
-//                                         className={`px-2 py-1 rounded text-xs ${item.status === "Critical"
-//                                                 ? "bg-red-500/20 text-red-400"
-//                                                 : item.status === "Resolved"
-//                                                     ? "bg-green-500/20 text-green-400"
-//                                                     : "bg-yellow-500/20 text-yellow-400"
-//                                             }`}
-//                                     >
-//                                         {item.status}
-//                                     </span>
-//                                 </td>
-
-//                                 <td>
-//                                     <select
-//                                         className="bg-[#1f2937] text-white text-xs rounded px-2 py-1"
-//                                         value={item.status}
-//                                         onChange={(e) =>
-//                                             handleStatusChange(item.id, e.target.value)
-//                                         }
-//                                     >
-//                                         <option value="Critical">Critical</option>
-//                                         <option value="Resolved">Resolved</option>
-//                                     </select>
-//                                 </td>
-
-//                                 {/* 🔥 UPDATED DELETE */}
-//                                 <td>
-//                                     <button
-//                                         onClick={() => setDeleteId(item.id)}
-//                                         className="px-2 py-1 bg-red-600 text-white text-xs rounded"
-//                                     >
-//                                         Delete
-//                                     </button>
-//                                 </td>
-//                             </tr>
-//                         ))}
-//                     </tbody>
-//                 </table>
-
-//                 {filtered.length === 0 && (
-//                     <div className="text-center mt-6 text-gray-400">
-//                         Tidak ada data
-//                     </div>
-//                 )}
-//             </div>
-
-//             {/* 🔥 CONFIRM DELETE MODAL */}
+//             {/* MODAL DELETE */}
 //             {deleteId !== null && (
-//                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-//                     <div className="bg-[#1f2937] p-6 rounded-lg w-[350px] text-white">
-//                         <h2 className="text-lg font-bold mb-4">
-//                             ⚠️ Hapus Data?
-//                         </h2>
-
-//                         <p className="text-sm mb-6 text-gray-300">
-//                             Data ini akan dihapus permanen. Yakin?
-//                         </p>
-
-//                         <div className="flex justify-end gap-2">
-//                             <button
-//                                 onClick={() => setDeleteId(null)}
-//                                 className="px-4 py-2 bg-gray-500 rounded"
-//                             >
-//                                 Cancel
-//                             </button>
-
-//                             <button
-//                                 onClick={() => {
-//                                     handleDelete(deleteId);
-//                                     setDeleteId(null);
-//                                 }}
-//                                 className="px-4 py-2 bg-red-600 rounded"
-//                             >
-//                                 Delete
-//                             </button>
-//                         </div>
+//                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+//                     <div className="bg-white p-4">
+//                         <p>Yakin hapus?</p>
+//                         <button onClick={() => setDeleteId(null)}>Cancel</button>
+//                         <button
+//                             onClick={() => {
+//                                 handleDelete(deleteId);
+//                                 setDeleteId(null);
+//                             }}
+//                         >
+//                             Delete
+//                         </button>
 //                     </div>
 //                 </div>
 //             )}
@@ -295,10 +297,9 @@
 
 
 
-
-
 import React, { useMemo, useState, useEffect } from "react";
 import { useLocations } from "../hooks/useLocations";
+import { useNavigate } from "react-router-dom";
 
 // 🔥 logic dari MapView
 const getDistance = (lat1, lon1, lat2, lon2) => {
@@ -329,14 +330,25 @@ const checkViolation = (current, all) => {
 };
 
 const ViolationsPage = () => {
-    const rawLocations = useLocations() || [];
+    const navigate = useNavigate();
 
+    const rawLocations = useLocations() || [];
     const [locations, setLocations] = useState([]);
 
-    // 🔥 NEW STATE UNDO
     const [deletedItem, setDeletedItem] = useState(null);
 
-    // 🔥 LOAD LOCAL STORAGE
+    // 🔥 ROLE STATE
+    const [role, setRole] = useState("user");
+
+    useEffect(() => {
+        const savedRole = localStorage.getItem("role");
+        if (savedRole) setRole(savedRole);
+    }, []);
+
+    useEffect(() => {
+        localStorage.setItem("role", role);
+    }, [role]);
+
     useEffect(() => {
         try {
             const saved = localStorage.getItem("locations");
@@ -346,14 +358,12 @@ const ViolationsPage = () => {
         }
     }, []);
 
-    // 🔥 FALLBACK DATA
     useEffect(() => {
         if (rawLocations.length > 0) {
             setLocations(prev => (prev.length === 0 ? rawLocations : prev));
         }
     }, [rawLocations]);
 
-    // 🔥 SAVE LOCAL STORAGE
     useEffect(() => {
         if (locations.length > 0) {
             localStorage.setItem("locations", JSON.stringify(locations));
@@ -364,7 +374,6 @@ const ViolationsPage = () => {
     const [showOnlyViolation, setShowOnlyViolation] = useState(false);
     const [deleteId, setDeleteId] = useState(null);
 
-    // 🔥 EDIT STATUS
     const handleStatusChange = (id, newStatus) => {
         setLocations(prev =>
             prev.map((loc, i) =>
@@ -373,7 +382,6 @@ const ViolationsPage = () => {
         );
     };
 
-    // 🔥 EDIT LIMIT & SATURATION
     const handleFieldChange = (id, field, value) => {
         setLocations(prev =>
             prev.map((loc, i) =>
@@ -382,13 +390,12 @@ const ViolationsPage = () => {
         );
     };
 
-    // 🔥 DELETE + SIMPAN UNTUK UNDO
     const handleDelete = (id) => {
         setLocations((prev) => {
             const itemToDelete = prev.find((_, i) => i === id);
             const updated = prev.filter((_, i) => i !== id);
 
-            setDeletedItem(itemToDelete); // 🔥 simpan
+            setDeletedItem(itemToDelete);
 
             localStorage.setItem("locations", JSON.stringify(updated));
 
@@ -396,15 +403,12 @@ const ViolationsPage = () => {
         });
     };
 
-    // 🔥 UNDO FUNCTION
     const handleUndo = () => {
         if (!deletedItem) return;
 
         setLocations((prev) => {
             const updated = [...prev, deletedItem];
-
             localStorage.setItem("locations", JSON.stringify(updated));
-
             return updated;
         });
 
@@ -442,7 +446,9 @@ const ViolationsPage = () => {
                     rule: "< 500m from Pasar",
                     limit,
                     saturation,
-                    status
+                    status,
+                    lat: loc.lat,
+                    lng: loc.lng,
                 };
             })
             .filter(Boolean);
@@ -460,15 +466,30 @@ const ViolationsPage = () => {
         <div className="ml-64 p-8 text-white">
             <h1 className="text-2xl font-bold mb-6">All Violations</h1>
 
-            {/* 🔥 UNDO UI */}
-            {deletedItem && (
-                <div className="mb-4 p-3 bg-yellow-500/20 text-yellow-300 rounded flex justify-between items-center">
-                    <span>Data berhasil dihapus</span>
+            {/* 🔥 ROLE INFO */}
+            <div className="mb-2 text-sm">
+                Role: <b>{role.toUpperCase()}</b>
+            </div>
 
-                    <button
-                        onClick={handleUndo}
-                        className="px-3 py-1 bg-yellow-500 text-black rounded text-xs"
-                    >
+            {/* 🔥 TOGGLE ROLE */}
+            <button
+                onClick={() => setRole(prev => prev === "admin" ? "user" : "admin")}
+                className="mb-4 px-4 py-2 bg-blue-600 rounded"
+            >
+                Switch to {role === "admin" ? "User" : "Admin"}
+            </button>
+
+            {/* KPI */}
+            <div className="mb-4 flex gap-4">
+                <div>Critical: {violations.filter(v => v.status === "Critical").length}</div>
+                <div>Warning: {violations.filter(v => v.status === "Warning").length}</div>
+                <div>Safe: {violations.filter(v => v.status === "Safe").length}</div>
+            </div>
+
+            {deletedItem && (
+                <div className="mb-4 p-3 bg-yellow-500/20 text-yellow-300 rounded flex justify-between">
+                    <span>Data dihapus</span>
+                    <button onClick={handleUndo} className="bg-yellow-500 px-2 rounded text-black">
                         Undo
                     </button>
                 </div>
@@ -487,80 +508,90 @@ const ViolationsPage = () => {
                 className="mb-4 p-2 rounded bg-[#1f2937] w-full"
             />
 
-            <div className="bg-surface-container rounded-xl p-4">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Entity</th>
-                            <th>District</th>
-                            <th>Rule</th>
-                            <th>Limit</th>
-                            <th>Saturation</th>
-                            <th>Status</th>
-                            <th>Edit</th>
-                            <th>Delete</th>
-                        </tr>
-                    </thead>
+            <table className="w-full text-sm">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Entity</th>
+                        <th>District</th>
+                        <th>Rule</th>
+                        <th>Limit</th>
+                        <th>Saturation</th>
+                        <th>Status</th>
+                        <th>Edit</th>
+                        <th>Delete</th>
+                    </tr>
+                </thead>
 
-                    <tbody>
-                        {filtered.map((item, i) => (
-                            <tr key={i}>
-                                <td>{item.code}</td>
-                                <td>{item.name}</td>
-                                <td>{item.district}</td>
-                                <td>{item.rule}</td>
+                <tbody>
+                    {filtered.map((item, i) => (
+                        <tr
+                            key={i}
+                            className={item.status === "Critical" ? "bg-red-500/10 cursor-pointer" : "cursor-pointer"}
+                            onClick={() => navigate(`/map?lat=${item.lat}&lng=${item.lng}`)}
+                        >
+                            <td>{item.code}</td>
+                            <td>{item.name}</td>
+                            <td>{item.district}</td>
+                            <td>{item.rule}</td>
 
-                                <td>
-                                    <input
-                                        type="number"
-                                        value={item.limit}
-                                        className="w-16 bg-[#1f2937] text-white border border-white/10 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                        onChange={(e) =>
-                                            handleFieldChange(item.id, "limit", Number(e.target.value))
-                                        }
-                                    />
-                                </td>
+                            <td>
+                                <input
+                                    type="number"
+                                    value={item.limit}
+                                    disabled={role !== "admin"}
+                                    className="w-16 bg-gray-200 text-black rounded px-2 disabled:opacity-50"
+                                    onChange={(e) =>
+                                        handleFieldChange(item.id, "limit", Number(e.target.value))
+                                    }
+                                />
+                            </td>
 
-                                <td>
-                                    <input
-                                        type="number"
-                                        value={item.saturation}
-                                        className="w-16 bg-[#1f2937] text-white border border-white/10 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-purple-500"
-                                        onChange={(e) =>
-                                            handleFieldChange(item.id, "saturation", Number(e.target.value))
-                                        }
-                                    />
-                                </td>
+                            <td>
+                                <input
+                                    type="number"
+                                    value={item.saturation}
+                                    disabled={role !== "admin"}
+                                    className="w-16 bg-gray-200 text-black rounded px-2 disabled:opacity-50"
+                                    onChange={(e) =>
+                                        handleFieldChange(item.id, "saturation", Number(e.target.value))
+                                    }
+                                />
+                            </td>
 
-                                <td>{item.status}</td>
+                            <td>{item.status}</td>
 
-                                <td>
-                                    <select
-                                        value={item.status}
-                                        onChange={(e) =>
-                                            handleStatusChange(item.id, e.target.value)
-                                        }
-                                    >
-                                        <option value="Critical">Critical</option>
-                                        <option value="Resolved">Resolved</option>
-                                    </select>
-                                </td>
+                            <td>
+                                <select
+                                    value={item.status}
+                                    disabled={role !== "admin"}
+                                    className="bg-gray-200 text-black rounded px-2 disabled:opacity-50"
+                                    onChange={(e) =>
+                                        handleStatusChange(item.id, e.target.value)
+                                    }
+                                >
+                                    <option value="Critical">Critical</option>
+                                    <option value="Resolved">Resolved</option>
+                                </select>
+                            </td>
 
-                                <td>
-                                    <button onClick={() => setDeleteId(item.id)}>
+                            <td>
+                                {role === "admin" && (
+                                    <button onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDeleteId(item.id);
+                                    }}>
                                         Delete
                                     </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                                )}
+                            </td>
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
 
-                {filtered.length === 0 && <div>Tidak ada data</div>}
-            </div>
+            {filtered.length === 0 && <div>Tidak ada data</div>}
 
-            {/* MODAL DELETE */}
             {deleteId !== null && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
                     <div className="bg-white p-4">
