@@ -2,7 +2,7 @@ import React from 'react';
 import { useStats } from "../hooks/useStats";
 
 const KPIGrid = () => {
-  const stats = useStats();
+  const { loading, pasar, total, violations, safe, compliance } = useStats();
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6 mb-8">
@@ -25,7 +25,7 @@ const KPIGrid = () => {
         </div>
 
         <div className="font-number text-4xl font-bold text-on-surface">
-          142
+          {loading ? <span className="text-on-surface-variant animate-pulse">—</span> : pasar}
         </div>
 
         <div className="mt-3 text-xs text-tertiary flex items-center gap-1">
@@ -54,7 +54,7 @@ const KPIGrid = () => {
         </div>
 
         <div className="font-number text-4xl font-bold text-on-surface">
-          {stats.total}
+          {loading ? <span className="text-on-surface-variant animate-pulse">—</span> : total}
         </div>
 
         <div className="mt-3 text-xs text-primary flex items-center gap-1">
@@ -83,7 +83,7 @@ const KPIGrid = () => {
         </div>
 
         <div className="font-number text-4xl font-bold text-error">
-          {stats.violations}
+          {loading ? <span className="text-error/40 animate-pulse">—</span> : violations}
         </div>
 
         <div className="mt-3 text-xs text-error flex items-center gap-1">
@@ -112,7 +112,7 @@ const KPIGrid = () => {
         </div>
 
         <div className="font-number text-4xl font-bold text-tertiary">
-          {stats.compliance}%
+          {loading ? <span className="text-tertiary/40 animate-pulse">—</span> : `${compliance}%`}
         </div>
 
         <div className="mt-3 text-xs text-on-surface-variant flex items-center gap-1">
@@ -138,7 +138,7 @@ const KPIGrid = () => {
         </div>
 
         <div className="font-number text-4xl font-bold text-green-500">
-          {stats.safe}
+          {loading ? <span className="text-green-500/40 animate-pulse">—</span> : safe}
         </div>
 
         <div className="mt-3 text-xs text-on-surface-variant">

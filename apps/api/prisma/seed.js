@@ -43,16 +43,16 @@ function readCSV(filePath) {
 
 // ─── District Metadata ────────────────────────────────────
 const DISTRICT_META = {
-  'Cilandak':           { code: 'JKT-S-CLK-01', lat: -6.2850, lng: 106.7920, saturation: 78 },
-  'Jagakarsa':          { code: 'JKT-S-JGK-02', lat: -6.3400, lng: 106.8250, saturation: 92 },
-  'Kebayoran Baru':     { code: 'JKT-S-KBB-03', lat: -6.2420, lng: 106.7830, saturation: 82 },
-  'Kebayoran Lama':     { code: 'JKT-S-KBL-04', lat: -6.2500, lng: 106.7750, saturation: 88 },
-  'Mampang Prapatan':   { code: 'JKT-S-MPP-05', lat: -6.2470, lng: 106.8250, saturation: 74 },
-  'Pancoran':           { code: 'JKT-S-PCR-06', lat: -6.2480, lng: 106.8400, saturation: 68 },
-  'Pasar Minggu':       { code: 'JKT-S-PMG-07', lat: -6.2850, lng: 106.8450, saturation: 71 },
-  'Pesanggrahan':       { code: 'JKT-S-PSG-08', lat: -6.2650, lng: 106.7600, saturation: 85 },
-  'Setiabudi':          { code: 'JKT-S-STB-09', lat: -6.2190, lng: 106.8300, saturation: 98 },
-  'Tebet':              { code: 'JKT-S-TBT-10', lat: -6.2270, lng: 106.8520, saturation: 65 },
+  'Cilandak': { code: 'JKT-S-CLK-01', lat: -6.2850, lng: 106.7920, saturation: 78 },
+  'Jagakarsa': { code: 'JKT-S-JGK-02', lat: -6.3400, lng: 106.8250, saturation: 92 },
+  'Kebayoran Baru': { code: 'JKT-S-KBB-03', lat: -6.2420, lng: 106.7830, saturation: 82 },
+  'Kebayoran Lama': { code: 'JKT-S-KBL-04', lat: -6.2500, lng: 106.7750, saturation: 88 },
+  'Mampang Prapatan': { code: 'JKT-S-MPP-05', lat: -6.2470, lng: 106.8250, saturation: 74 },
+  'Pancoran': { code: 'JKT-S-PCR-06', lat: -6.2480, lng: 106.8400, saturation: 68 },
+  'Pasar Minggu': { code: 'JKT-S-PMG-07', lat: -6.2850, lng: 106.8450, saturation: 71 },
+  'Pesanggrahan': { code: 'JKT-S-PSG-08', lat: -6.2650, lng: 106.7600, saturation: 85 },
+  'Setiabudi': { code: 'JKT-S-STB-09', lat: -6.2190, lng: 106.8300, saturation: 98 },
+  'Tebet': { code: 'JKT-S-TBT-10', lat: -6.2270, lng: 106.8520, saturation: 65 },
 };
 
 function getDistrictStatus(saturation) {
@@ -156,47 +156,110 @@ async function main() {
   }
   console.log(`   ✅ Imported ${importedCount} minimarket entities (skipped ${skippedCount})`);
 
+  // // ── 4. Seed Pasar (Traditional Markets) ──
   // ── 4. Seed Pasar (Traditional Markets) ──
-  console.log('🏬 Seeding traditional markets (Pasar)...');
-  const pasarData = [
-    { name: 'Pasar Santa',          district: 'Kebayoran Baru',     lat: -6.2430, lng: 106.7940, kelurahan: 'Senayan' },
-    { name: 'Pasar Cipulir',        district: 'Kebayoran Lama',     lat: -6.2550, lng: 106.7700, kelurahan: 'Cipulir' },
-    { name: 'Pasar Minggu',         district: 'Pasar Minggu',       lat: -6.2840, lng: 106.8440, kelurahan: 'Pasar Minggu' },
-    { name: 'Pasar Lenteng Agung',  district: 'Jagakarsa',          lat: -6.3350, lng: 106.8300, kelurahan: 'Lenteng Agung' },
-    { name: 'Pasar Cilandak',       district: 'Cilandak',           lat: -6.2900, lng: 106.7950, kelurahan: 'Cilandak Barat' },
-    { name: 'Pasar Tebet',          district: 'Tebet',              lat: -6.2280, lng: 106.8500, kelurahan: 'Tebet Barat' },
-    { name: 'Pasar Mampang',        district: 'Mampang Prapatan',   lat: -6.2470, lng: 106.8220, kelurahan: 'Mampang Prapatan' },
-    { name: 'Pasar Pancoran',       district: 'Pancoran',           lat: -6.2510, lng: 106.8420, kelurahan: 'Pancoran' },
-    { name: 'Pasar Bata Putih',     district: 'Setiabudi',          lat: -6.2200, lng: 106.8350, kelurahan: 'Karet Kuningan' },
-    { name: 'Pasar Pesanggrahan',   district: 'Pesanggrahan',       lat: -6.2680, lng: 106.7550, kelurahan: 'Pesanggrahan' },
-    { name: 'Pasar Bintaro',        district: 'Pesanggrahan',       lat: -6.2720, lng: 106.7620, kelurahan: 'Bintaro' },
-    { name: 'Pasar Kebayoran Lama', district: 'Kebayoran Lama',     lat: -6.2450, lng: 106.7800, kelurahan: 'Kebayoran Lama Selatan' },
-    { name: 'Pasar Rumput',         district: 'Setiabudi',          lat: -6.2150, lng: 106.8380, kelurahan: 'Guntur' },
-    { name: 'Pasar Jagakarsa',      district: 'Jagakarsa',          lat: -6.3420, lng: 106.8200, kelurahan: 'Jagakarsa' },
-    { name: 'Pasar Kalibata',       district: 'Pancoran',           lat: -6.2580, lng: 106.8520, kelurahan: 'Kalibata' },
-  ];
+  console.log('🏬 Importing traditional markets (Pasar) from CSV...');
 
-  for (const p of pasarData) {
-    const dist = districtMap[p.district];
-    if (!dist) continue;
+  // Arahkan ke file CSV pasar yang baru di-download
+  const csvPasarPath = path.join(__dirname, 'data', 'jaksel_pasar_final.csv');
+  const rowsPasar = readCSV(csvPasarPath);
+  console.log(`   📄 Found ${rowsPasar.length} rows in Pasar CSV`);
+
+  let importedPasarCount = 0;
+  let skippedPasarCount = 0;
+
+  for (const row of rowsPasar) {
+    // Cari district/kecamatan. Cek kolom kecamatan jika ada, atau ekstrak dari alamat_tempat
+    let matchedDistrict = null;
+    const districtFromColumn = row.kecamatan || row.nama_kecamatan;
+
+    if (districtFromColumn && districtMap[districtFromColumn]) {
+      matchedDistrict = districtMap[districtFromColumn];
+    } else {
+      // Jika kolom kecamatan tidak ada, kita cari nama kecamatan dari dalam string alamat_tempat
+      const alamat = (row.alamat_tempat || '').toLowerCase();
+      for (const distName of Object.keys(DISTRICT_META)) {
+        if (alamat.includes(distName.toLowerCase())) {
+          matchedDistrict = districtMap[distName];
+          break;
+        }
+      }
+    }
+
+    // Skip jika kecamatannya tidak ada di daftar DISTRICT_META kita
+    if (!matchedDistrict) {
+      skippedPasarCount++;
+      continue;
+    }
+
+    const lat = parseFloat(row.latitude);
+    const lng = parseFloat(row.longitude);
+
+    if (isNaN(lat) || isNaN(lng)) {
+      skippedPasarCount++;
+      continue;
+    }
+
     await prisma.entity.create({
       data: {
-        name: p.name,
+        name: row.nama_tempat || 'Unknown Pasar',
         type: 'PASAR',
-        address: `${p.name}, ${p.district}, Jakarta Selatan`,
-        latitude: p.lat,
-        longitude: p.lng,
-        kelurahan: p.kelurahan,
-        rating: Math.round((Math.random() * 2 + 3) * 10) / 10, // 3.0-5.0
-        totalRatings: Math.floor(Math.random() * 500) + 50,
+        store: row.store || 'Pasar',
+        address: row.alamat_tempat || null,
+        latitude: lat,
+        longitude: lng,
+        placeId: row.place_id || null,
+        rating: parseFloat(row.rating_tempat) || 0,
+        totalRatings: parseInt(row.user_ratings_total) || 0,
         permitStatus: 'APPROVED',
-        complianceScore: 95,
+        complianceScore: 95, // Pasar diasumsikan selalu comply
         isFlagged: false,
-        districtId: dist.id,
+        districtId: matchedDistrict.id,
       },
     });
+    importedPasarCount++;
   }
-  console.log(`   ✅ Created ${pasarData.length} traditional markets`);
+  console.log(`   ✅ Imported ${importedPasarCount} traditional markets (skipped ${skippedPasarCount})`);
+  // console.log('🏬 Seeding traditional markets (Pasar)...');
+  // const pasarData = [
+  //   { name: 'Pasar Santa',          district: 'Kebayoran Baru',     lat: -6.2430, lng: 106.7940, kelurahan: 'Senayan' },
+  //   { name: 'Pasar Cipulir',        district: 'Kebayoran Lama',     lat: -6.2550, lng: 106.7700, kelurahan: 'Cipulir' },
+  //   { name: 'Pasar Minggu',         district: 'Pasar Minggu',       lat: -6.2840, lng: 106.8440, kelurahan: 'Pasar Minggu' },
+  //   { name: 'Pasar Lenteng Agung',  district: 'Jagakarsa',          lat: -6.3350, lng: 106.8300, kelurahan: 'Lenteng Agung' },
+  //   { name: 'Pasar Cilandak',       district: 'Cilandak',           lat: -6.2900, lng: 106.7950, kelurahan: 'Cilandak Barat' },
+  //   { name: 'Pasar Tebet',          district: 'Tebet',              lat: -6.2280, lng: 106.8500, kelurahan: 'Tebet Barat' },
+  //   { name: 'Pasar Mampang',        district: 'Mampang Prapatan',   lat: -6.2470, lng: 106.8220, kelurahan: 'Mampang Prapatan' },
+  //   { name: 'Pasar Pancoran',       district: 'Pancoran',           lat: -6.2510, lng: 106.8420, kelurahan: 'Pancoran' },
+  //   { name: 'Pasar Bata Putih',     district: 'Setiabudi',          lat: -6.2200, lng: 106.8350, kelurahan: 'Karet Kuningan' },
+  //   { name: 'Pasar Pesanggrahan',   district: 'Pesanggrahan',       lat: -6.2680, lng: 106.7550, kelurahan: 'Pesanggrahan' },
+  //   { name: 'Pasar Bintaro',        district: 'Pesanggrahan',       lat: -6.2720, lng: 106.7620, kelurahan: 'Bintaro' },
+  //   { name: 'Pasar Kebayoran Lama', district: 'Kebayoran Lama',     lat: -6.2450, lng: 106.7800, kelurahan: 'Kebayoran Lama Selatan' },
+  //   { name: 'Pasar Rumput',         district: 'Setiabudi',          lat: -6.2150, lng: 106.8380, kelurahan: 'Guntur' },
+  //   { name: 'Pasar Jagakarsa',      district: 'Jagakarsa',          lat: -6.3420, lng: 106.8200, kelurahan: 'Jagakarsa' },
+  //   { name: 'Pasar Kalibata',       district: 'Pancoran',           lat: -6.2580, lng: 106.8520, kelurahan: 'Kalibata' },
+  // ];
+
+  // for (const p of pasarData) {
+  //   const dist = districtMap[p.district];
+  //   if (!dist) continue;
+  //   await prisma.entity.create({
+  //     data: {
+  //       name: p.name,
+  //       type: 'PASAR',
+  //       address: `${p.name}, ${p.district}, Jakarta Selatan`,
+  //       latitude: p.lat,
+  //       longitude: p.lng,
+  //       kelurahan: p.kelurahan,
+  //       rating: Math.round((Math.random() * 2 + 3) * 10) / 10, // 3.0-5.0
+  //       totalRatings: Math.floor(Math.random() * 500) + 50,
+  //       permitStatus: 'APPROVED',
+  //       complianceScore: 95,
+  //       isFlagged: false,
+  //       districtId: dist.id,
+  //     },
+  //   });
+  // }
+  // console.log(`   ✅ Created ${pasarData.length} traditional markets`);
 
   // ── 5. Seed Zoning Rules ──
   console.log('📏 Seeding zoning rules...');
@@ -319,13 +382,13 @@ async function main() {
   // ── 9. Seed Flagged Clusters ──
   console.log('🔴 Seeding flagged clusters...');
   const clusterData = [
-    { district: 'Setiabudi',        street: 'Jl. Rasuna Said',      desc: '8 unzoned commercial entities within 200m', count: 8 },
-    { district: 'Jagakarsa',        street: 'Jl. Raya Jagakarsa',   desc: '12 minimarkets exceeding zone capacity', count: 12 },
-    { district: 'Kebayoran Lama',   street: 'Jl. Cipulir Raya',     desc: '6 Alfamart/Indomaret within 100m radius', count: 6 },
-    { district: 'Kebayoran Baru',   street: 'Jl. Senopati',         desc: '5 retail stores near Pasar Santa', count: 5 },
-    { district: 'Pesanggrahan',     street: 'Jl. Bintaro Utama',    desc: '9 minimarkets in residential zone', count: 9 },
-    { district: 'Tebet',            street: 'Jl. Tebet Raya',       desc: '4 stores violating proximity to Pasar Tebet', count: 4 },
-    { district: 'Pancoran',         street: 'Jl. Kalibata Raya',    desc: '7 unzoned commercial near Pasar Kalibata', count: 7 },
+    { district: 'Setiabudi', street: 'Jl. Rasuna Said', desc: '8 unzoned commercial entities within 200m', count: 8 },
+    { district: 'Jagakarsa', street: 'Jl. Raya Jagakarsa', desc: '12 minimarkets exceeding zone capacity', count: 12 },
+    { district: 'Kebayoran Lama', street: 'Jl. Cipulir Raya', desc: '6 Alfamart/Indomaret within 100m radius', count: 6 },
+    { district: 'Kebayoran Baru', street: 'Jl. Senopati', desc: '5 retail stores near Pasar Santa', count: 5 },
+    { district: 'Pesanggrahan', street: 'Jl. Bintaro Utama', desc: '9 minimarkets in residential zone', count: 9 },
+    { district: 'Tebet', street: 'Jl. Tebet Raya', desc: '4 stores violating proximity to Pasar Tebet', count: 4 },
+    { district: 'Pancoran', street: 'Jl. Kalibata Raya', desc: '7 unzoned commercial near Pasar Kalibata', count: 7 },
     { district: 'Mampang Prapatan', street: 'Jl. Mampang Prapatan', desc: '42 unzoned commercial', count: 42 },
   ];
 
@@ -346,9 +409,9 @@ async function main() {
   // ── 10. Seed AI Forecasts ──
   console.log('🤖 Seeding AI forecasts...');
   const forecastData = [
-    { district: 'Tebet',      prob: 92, pred: 'Minimarket saturation projected to exceed critical threshold. Recommend moratorium on new permits.', months: 6 },
-    { district: 'Setiabudi',  prob: 88, pred: 'High density zone reaching capacity. Enforcement action recommended within 3 months.', months: 3 },
-    { district: 'Jagakarsa',  prob: 76, pred: 'Moderate growth trajectory. Monitor Lenteng Agung corridor for emerging clusters.', months: 6 },
+    { district: 'Tebet', prob: 92, pred: 'Minimarket saturation projected to exceed critical threshold. Recommend moratorium on new permits.', months: 6 },
+    { district: 'Setiabudi', prob: 88, pred: 'High density zone reaching capacity. Enforcement action recommended within 3 months.', months: 3 },
+    { district: 'Jagakarsa', prob: 76, pred: 'Moderate growth trajectory. Monitor Lenteng Agung corridor for emerging clusters.', months: 6 },
   ];
 
   for (const f of forecastData) {
