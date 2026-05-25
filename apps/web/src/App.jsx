@@ -9,6 +9,7 @@ import ViolationsPage from "./pages/ViolationsPage";
 
 // 🔥 TAMBAHAN
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
 
       {/* 🔓 PUBLIC */}
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />

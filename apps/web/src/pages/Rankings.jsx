@@ -19,7 +19,7 @@ const FALLBACK_RANKINGS = [
 ];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 
 function statusLabel(status) {
   const map = {

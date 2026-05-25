@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import Header from '../components/Header';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
-const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
 const PAGE_SIZE = 15;
 
 // KPI fallback – database snapshot: 662 total, 99 Critical, 0 Warning, 563 Safe

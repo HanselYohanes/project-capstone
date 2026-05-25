@@ -303,18 +303,35 @@ const Header = ({ onSearch }) => {
               logout();
             }
           }}
-          className="flex items-center gap-3 hover:bg-white/5 p-1 pr-3 rounded-lg transition-colors"
+          className="flex items-center gap-3 hover:bg-white/5 p-1 pr-3 rounded-lg transition-colors group"
         >
-          <img
-            alt="Profile"
-            className="w-8 h-8 rounded-md object-cover border border-outline-variant/30"
-            src="https://lh3.googleusercontent.com/aida-public/AB6AXuD4Gdn6nE9_qIpBPyYGtSBMGuPjCu9gJOkYt59GaV4Gqy9ToDFNxxDKowdTvYBo8T85Ke-EoyojlScLsM-e8JXvf9-68s6IG6CTSzGWU6JWDseHcW0QyTPLFX1M7aO8_-kGpV8bAeGlkGcsk7zh406hBjSx_e0m4APEo5hCyuh4JRmbegvDIUYH7tX2fel54LFtIy1dDiPyyQzbdLxJx8L2X7XRo9dbXJzVYxbDuPa6UHKbVpc-AuC-wr_sS2yDHi7OBns-0soOPfpj"
-          />
+          {/* Avatar: foto jika ada, fallback ke inisial */}
+          <div className="relative w-8 h-8 flex-shrink-0">
+            {user?.avatar ? (
+              <img
+                alt={user?.name || "Profile"}
+                className="w-8 h-8 rounded-md object-cover border border-outline-variant/30"
+                src={user.avatar}
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-md border border-outline-variant/30 bg-violet-600/80 flex items-center justify-center text-white text-sm font-bold uppercase">
+                {(user?.name || user?.email || "?").charAt(0)}
+              </div>
+            )}
+          </div>
 
-          {/* 🔥 FIX: TIDAK DOUBLE LAGI */}
-          <span className="text-sm font-medium">
-            {user ? user.email : "Admin"}
-          </span>
+          {/* Nama & Badge Role */}
+          <div className="flex flex-col items-start leading-tight">
+            <span className="text-sm font-semibold text-white">
+              {user?.name || user?.email || "Guest"}
+            </span>
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${user?.isAdmin
+              ? "bg-violet-500/20 text-violet-300"
+              : "bg-slate-500/20 text-slate-400"
+              }`}>
+              {user?.isAdmin ? "Admin" : "User"}
+            </span>
+          </div>
         </button>
 
       </div>

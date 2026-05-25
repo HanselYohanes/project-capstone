@@ -2,6 +2,8 @@ import { createContext, useContext, useState } from "react";
 
 const AuthContext = createContext();
 
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
 export const AuthProvider = ({ children }) => {
 
     // 🔥 LOAD DARI LOCALSTORAGE (AUTO LOGIN)
@@ -10,26 +12,46 @@ export const AuthProvider = ({ children }) => {
         return savedUser ? JSON.parse(savedUser) : null;
     });
 
-    // 🔥 LOGIN
-    const login = (email, password) => {
-        if (!email || !password) return false;
+    // 🔥 LOGIN — async, panggil API backend
+    const login = async (email, password) => {
+        if (!email || !password) return { success: false, error: "Email dan password wajib diisi" };
 
-        const userData = {
-            email,
-            role: "admin", // sementara semua dianggap admin
-        };
+        try {
+            const res = await fetch(`${API_BASE}/api/v1/auth/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
 
-        setUser(userData);
-        localStorage.setItem("user", JSON.stringify(userData));
+            const json = await res.json();
 
-        return true;
+            if (!res.ok) {
+                return { success: false, error: json.message || "Login gagal" };
+            }
+
+            // Simpan data lengkap user dari response API
+            const userData = {
+                id: json.data.id,
+                email: json.data.email,
+                name: json.data.username,   // field 'name' dipakai di Header
+                isAdmin: json.data.isAdmin ?? false,
+                avatar: json.data.avatar || null,
+                token: json.token,
+            };
+
+            setUser(userData);
+            localStorage.setItem("user", JSON.stringify(userData));
+
+            return { success: true };
+        } catch (err) {
+            console.error("LOGIN ERROR:", err);
+            return { success: false, error: "Tidak dapat terhubung ke server" };
+        }
     };
 
     // 🔥 LOGOUT
     const logout = () => {
         setUser(null);
-
-        // 🔥 HAPUS STORAGE
         localStorage.removeItem("user");
     };
 
