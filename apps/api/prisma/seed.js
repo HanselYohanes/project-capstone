@@ -23,7 +23,12 @@ function parseCSVLine(line) {
   return result;
 }
 
-function readCSV(filePath) {
+/**
+ * Generic CSV reader. By default maps every column by its header name.
+ * Pass `duplicateKeyIndex` to rename a specific column index (used for
+ * the raw entity CSVs that have a duplicate place_id column).
+ */
+function readCSV(filePath, { duplicateKeyIndex } = {}) {
   const text = fs.readFileSync(filePath, 'utf8');
   const lines = text.split('\n').filter(l => l.trim());
   const header = parseCSVLine(lines[0]);
@@ -32,29 +37,26 @@ function readCSV(filePath) {
     const cols = parseCSVLine(lines[i]);
     const row = {};
     header.forEach((h, idx) => {
-      // Handle duplicate place_id column
-      const key = idx === 8 ? 'place_id_2' : h;
-      row[key] = cols[idx] || '';
+      const key = (duplicateKeyIndex !== undefined && idx === duplicateKeyIndex)
+        ? 'place_id_2'
+        : h;
+      row[key] = cols[idx] ?? '';
     });
     rows.push(row);
   }
   return rows;
 }
 
-// ─── District Metadata ────────────────────────────────────
-const DISTRICT_META = {
-  'Cilandak': { code: 'JKT-S-CLK-01', lat: -6.2850, lng: 106.7920, saturation: 78 },
-  'Jagakarsa': { code: 'JKT-S-JGK-02', lat: -6.3400, lng: 106.8250, saturation: 92 },
-  'Kebayoran Baru': { code: 'JKT-S-KBB-03', lat: -6.2420, lng: 106.7830, saturation: 82 },
-  'Kebayoran Lama': { code: 'JKT-S-KBL-04', lat: -6.2500, lng: 106.7750, saturation: 88 },
-  'Mampang Prapatan': { code: 'JKT-S-MPP-05', lat: -6.2470, lng: 106.8250, saturation: 74 },
-  'Pancoran': { code: 'JKT-S-PCR-06', lat: -6.2480, lng: 106.8400, saturation: 68 },
-  'Pasar Minggu': { code: 'JKT-S-PMG-07', lat: -6.2850, lng: 106.8450, saturation: 71 },
-  'Pesanggrahan': { code: 'JKT-S-PSG-08', lat: -6.2650, lng: 106.7600, saturation: 85 },
-  'Setiabudi': { code: 'JKT-S-STB-09', lat: -6.2190, lng: 106.8300, saturation: 98 },
-  'Tebet': { code: 'JKT-S-TBT-10', lat: -6.2270, lng: 106.8520, saturation: 65 },
-};
+/** Parse a CSV value to its most natural JS type (bool > number > string). */
+function parseValue(raw) {
+  if (raw === 'true') return true;
+  if (raw === 'false') return false;
+  const num = Number(raw);
+  if (!isNaN(num) && raw !== '') return num;
+  return raw;
+}
 
+// ─── District Status Helper ───────────────────────────────
 function getDistrictStatus(saturation) {
   if (saturation >= 90) return 'CRITICAL';
   if (saturation >= 80) return 'WARNING';
@@ -62,6 +64,9 @@ function getDistrictStatus(saturation) {
   if (saturation >= 50) return 'STABLE';
   return 'SAFE';
 }
+
+// ─── Data file paths ─────────────────────────────────────
+const DATA = (file) => path.join(__dirname, 'data', file);
 
 // ─── Main Seed Function ──────────────────────────────────
 async function main() {
@@ -79,28 +84,32 @@ async function main() {
   await prisma.district.deleteMany();
   await prisma.systemSetting.deleteMany();
 
-  // ── 2. Seed Districts ──
+  // ── 2. Seed Districts (from districts.csv) ──
   console.log('📍 Seeding districts...');
-  const districtMap = {};
-  for (const [name, meta] of Object.entries(DISTRICT_META)) {
+  const districtRows = readCSV(DATA('districts.csv'));
+  const districtMap = {};        // name → DB record
+  const districtSaturation = {}; // name → saturation number (for saturation logs)
+
+  for (const row of districtRows) {
+    const saturation = parseFloat(row.saturation);
     const district = await prisma.district.create({
       data: {
-        name,
-        code: meta.code,
-        latitude: meta.lat,
-        longitude: meta.lng,
-        saturationPercent: meta.saturation,
-        status: getDistrictStatus(meta.saturation),
+        name: row.name,
+        code: row.code,
+        latitude: parseFloat(row.latitude),
+        longitude: parseFloat(row.longitude),
+        saturationPercent: saturation,
+        status: getDistrictStatus(saturation),
       },
     });
-    districtMap[name] = district;
+    districtMap[row.name] = district;
+    districtSaturation[row.name] = saturation;
   }
   console.log(`   ✅ Created ${Object.keys(districtMap).length} districts`);
 
-  // ── 3. Seed Entities from CSV ──
+  // ── 3. Seed Minimarket Entities (from jaksel_retail_final_v3.csv) ──
   console.log('🏪 Importing entities from CSV...');
-  const csvPath = path.join(__dirname, 'data', 'DATA_JAKSEL_FIXED_CLEANED.csv');
-  const rows = readCSV(csvPath);
+  const rows = readCSV(DATA('jaksel_retail_final_v3.csv'), { duplicateKeyIndex: 8 });
   console.log(`   📄 Found ${rows.length} rows in CSV`);
 
   let importedCount = 0;
@@ -108,37 +117,22 @@ async function main() {
   const seenPlaceIds = new Set();
 
   for (const row of rows) {
-    const kecamatan = row.nama_kecamatan;
-    const district = districtMap[kecamatan];
-    if (!district) {
-      skippedCount++;
-      continue;
-    }
+    const district = districtMap[row.nama_kecamatan];
+    if (!district) { skippedCount++; continue; }
 
     const placeId = row.place_id;
-    if (seenPlaceIds.has(placeId)) {
-      skippedCount++;
-      continue;
-    }
+    if (seenPlaceIds.has(placeId)) { skippedCount++; continue; }
     seenPlaceIds.add(placeId);
 
     const lat = parseFloat(row.latitude);
     const lng = parseFloat(row.longitude);
-    if (isNaN(lat) || isNaN(lng)) {
-      skippedCount++;
-      continue;
-    }
-
-    // Map store type: Alfamart/Indomaret → MINIMARKET
-    const entityType = 'MINIMARKET';
-    const storeName = row.store || 'Unknown';
-    const entityName = row.nama_tempat || storeName;
+    if (isNaN(lat) || isNaN(lng)) { skippedCount++; continue; }
 
     await prisma.entity.create({
       data: {
-        name: entityName,
-        type: entityType,
-        store: storeName,
+        name: row.nama_tempat || row.store || 'Unknown',
+        type: 'MINIMARKET',
+        store: row.store || 'Unknown',
         address: row.alamat_tempat || null,
         latitude: lat,
         longitude: lng,
@@ -147,7 +141,7 @@ async function main() {
         rating: parseFloat(row.rating_tempat) || 0,
         totalRatings: parseInt(row.user_ratings_total) || 0,
         permitStatus: 'APPROVED',
-        complianceScore: Math.floor(Math.random() * 30) + 70, // 70-100
+        complianceScore: Math.floor(Math.random() * 30) + 70, // 70–100
         isFlagged: false,
         districtId: district.id,
       },
@@ -156,29 +150,24 @@ async function main() {
   }
   console.log(`   ✅ Imported ${importedCount} minimarket entities (skipped ${skippedCount})`);
 
-  // // ── 4. Seed Pasar (Traditional Markets) ──
-  // ── 4. Seed Pasar (Traditional Markets) ──
+  // ── 4. Seed Pasar Entities (from jaksel_pasar_final.csv) ──
   console.log('🏬 Importing traditional markets (Pasar) from CSV...');
-
-  // Arahkan ke file CSV pasar yang baru di-download
-  const csvPasarPath = path.join(__dirname, 'data', 'jaksel_pasar_final.csv');
-  const rowsPasar = readCSV(csvPasarPath);
+  const rowsPasar = readCSV(DATA('jaksel_pasar_final.csv'));
   console.log(`   📄 Found ${rowsPasar.length} rows in Pasar CSV`);
 
   let importedPasarCount = 0;
   let skippedPasarCount = 0;
 
   for (const row of rowsPasar) {
-    // Cari district/kecamatan. Cek kolom kecamatan jika ada, atau ekstrak dari alamat_tempat
     let matchedDistrict = null;
     const districtFromColumn = row.kecamatan || row.nama_kecamatan;
 
     if (districtFromColumn && districtMap[districtFromColumn]) {
       matchedDistrict = districtMap[districtFromColumn];
     } else {
-      // Jika kolom kecamatan tidak ada, kita cari nama kecamatan dari dalam string alamat_tempat
+      // Fallback: cari nama kecamatan dari dalam string alamat
       const alamat = (row.alamat_tempat || '').toLowerCase();
-      for (const distName of Object.keys(DISTRICT_META)) {
+      for (const distName of Object.keys(districtMap)) {
         if (alamat.includes(distName.toLowerCase())) {
           matchedDistrict = districtMap[distName];
           break;
@@ -186,19 +175,11 @@ async function main() {
       }
     }
 
-    // Skip jika kecamatannya tidak ada di daftar DISTRICT_META kita
-    if (!matchedDistrict) {
-      skippedPasarCount++;
-      continue;
-    }
+    if (!matchedDistrict) { skippedPasarCount++; continue; }
 
     const lat = parseFloat(row.latitude);
     const lng = parseFloat(row.longitude);
-
-    if (isNaN(lat) || isNaN(lng)) {
-      skippedPasarCount++;
-      continue;
-    }
+    if (isNaN(lat) || isNaN(lng)) { skippedPasarCount++; continue; }
 
     await prisma.entity.create({
       data: {
@@ -212,7 +193,7 @@ async function main() {
         rating: parseFloat(row.rating_tempat) || 0,
         totalRatings: parseInt(row.user_ratings_total) || 0,
         permitStatus: 'APPROVED',
-        complianceScore: 95, // Pasar diasumsikan selalu comply
+        complianceScore: 95,
         isFlagged: false,
         districtId: matchedDistrict.id,
       },
@@ -220,126 +201,111 @@ async function main() {
     importedPasarCount++;
   }
   console.log(`   ✅ Imported ${importedPasarCount} traditional markets (skipped ${skippedPasarCount})`);
-  // console.log('🏬 Seeding traditional markets (Pasar)...');
-  // const pasarData = [
-  //   { name: 'Pasar Santa',          district: 'Kebayoran Baru',     lat: -6.2430, lng: 106.7940, kelurahan: 'Senayan' },
-  //   { name: 'Pasar Cipulir',        district: 'Kebayoran Lama',     lat: -6.2550, lng: 106.7700, kelurahan: 'Cipulir' },
-  //   { name: 'Pasar Minggu',         district: 'Pasar Minggu',       lat: -6.2840, lng: 106.8440, kelurahan: 'Pasar Minggu' },
-  //   { name: 'Pasar Lenteng Agung',  district: 'Jagakarsa',          lat: -6.3350, lng: 106.8300, kelurahan: 'Lenteng Agung' },
-  //   { name: 'Pasar Cilandak',       district: 'Cilandak',           lat: -6.2900, lng: 106.7950, kelurahan: 'Cilandak Barat' },
-  //   { name: 'Pasar Tebet',          district: 'Tebet',              lat: -6.2280, lng: 106.8500, kelurahan: 'Tebet Barat' },
-  //   { name: 'Pasar Mampang',        district: 'Mampang Prapatan',   lat: -6.2470, lng: 106.8220, kelurahan: 'Mampang Prapatan' },
-  //   { name: 'Pasar Pancoran',       district: 'Pancoran',           lat: -6.2510, lng: 106.8420, kelurahan: 'Pancoran' },
-  //   { name: 'Pasar Bata Putih',     district: 'Setiabudi',          lat: -6.2200, lng: 106.8350, kelurahan: 'Karet Kuningan' },
-  //   { name: 'Pasar Pesanggrahan',   district: 'Pesanggrahan',       lat: -6.2680, lng: 106.7550, kelurahan: 'Pesanggrahan' },
-  //   { name: 'Pasar Bintaro',        district: 'Pesanggrahan',       lat: -6.2720, lng: 106.7620, kelurahan: 'Bintaro' },
-  //   { name: 'Pasar Kebayoran Lama', district: 'Kebayoran Lama',     lat: -6.2450, lng: 106.7800, kelurahan: 'Kebayoran Lama Selatan' },
-  //   { name: 'Pasar Rumput',         district: 'Setiabudi',          lat: -6.2150, lng: 106.8380, kelurahan: 'Guntur' },
-  //   { name: 'Pasar Jagakarsa',      district: 'Jagakarsa',          lat: -6.3420, lng: 106.8200, kelurahan: 'Jagakarsa' },
-  //   { name: 'Pasar Kalibata',       district: 'Pancoran',           lat: -6.2580, lng: 106.8520, kelurahan: 'Kalibata' },
-  // ];
 
-  // for (const p of pasarData) {
-  //   const dist = districtMap[p.district];
-  //   if (!dist) continue;
-  //   await prisma.entity.create({
-  //     data: {
-  //       name: p.name,
-  //       type: 'PASAR',
-  //       address: `${p.name}, ${p.district}, Jakarta Selatan`,
-  //       latitude: p.lat,
-  //       longitude: p.lng,
-  //       kelurahan: p.kelurahan,
-  //       rating: Math.round((Math.random() * 2 + 3) * 10) / 10, // 3.0-5.0
-  //       totalRatings: Math.floor(Math.random() * 500) + 50,
-  //       permitStatus: 'APPROVED',
-  //       complianceScore: 95,
-  //       isFlagged: false,
-  //       districtId: dist.id,
-  //     },
-  //   });
-  // }
-  // console.log(`   ✅ Created ${pasarData.length} traditional markets`);
-
-  // ── 5. Seed Zoning Rules ──
+  // ── 5. Seed Zoning Rules (from zoning_rules.csv) ──
   console.log('📏 Seeding zoning rules...');
-  const rules = await Promise.all([
-    prisma.zoningRule.create({
+  const ruleRows = readCSV(DATA('zoning_rules.csv'));
+  const rules = [];
+
+  for (const row of ruleRows) {
+    const rule = await prisma.zoningRule.create({
       data: {
-        name: 'Minimarket Proximity to Pasar',
-        ruleType: 'PROXIMITY',
-        minDistanceMeters: 400,
-        targetEntityType: 'MINIMARKET',
-        referenceEntityType: 'PASAR',
+        name: row.name,
+        ruleType: row.ruleType,
+        minDistanceMeters: row.minDistanceMeters ? parseInt(row.minDistanceMeters) : null,
+        maxEntitiesPerZone: row.maxEntitiesPerZone ? parseInt(row.maxEntitiesPerZone) : null,
+        targetEntityType: row.targetEntityType || null,
+        referenceEntityType: row.referenceEntityType || null,
       },
-    }),
-    prisma.zoningRule.create({
-      data: {
-        name: 'Minimarket Mutual Proximity',
-        ruleType: 'PROXIMITY',
-        minDistanceMeters: 100,
-        targetEntityType: 'MINIMARKET',
-        referenceEntityType: 'MINIMARKET',
-      },
-    }),
-    prisma.zoningRule.create({
-      data: {
-        name: 'Zone Capacity Limit',
-        ruleType: 'CAPACITY',
-        maxEntitiesPerZone: 15,
-        targetEntityType: 'MINIMARKET',
-      },
-    }),
-  ]);
+    });
+    rules.push(rule);
+  }
   console.log(`   ✅ Created ${rules.length} zoning rules`);
 
-  // ── 6. Generate Violations ──
-  console.log('⚠️  Generating violations...');
+  // ── 6. Generate Violations (programmatic — depends on entity IDs) ──
+  console.log('⚠️ Generating violations...');
   const minimarkets = await prisma.entity.findMany({
     where: { type: 'MINIMARKET' },
-    take: 50,
+    take: 99, // <--- Kita ambil tepat 99 data minimarket
     include: { district: true },
   });
 
   const violationCodes = [];
   let vCount = 0;
-  for (let i = 0; i < Math.min(47, minimarkets.length); i++) {
+  for (let i = 0; i < minimarkets.length; i++) { // <--- Loop berjalan sampai semua 99 data terproses
     const entity = minimarkets[i];
     const code = `#V-${8800 + i}`;
     violationCodes.push(code);
-    const severity = i < 12 ? 'CRITICAL' : i < 25 ? 'WARNING' : 'ELEVATED';
-    const status = i < 35 ? 'ACTIVE' : 'RESOLVED';
+    const severity = i < 25 ? 'CRITICAL' : i < 60 ? 'WARNING' : 'ELEVATED';
+    const status = 'ACTIVE'; // <--- Kita buat ACTIVE semua agar terbaca di dashboard utama
 
     await prisma.violation.create({
       data: {
         code,
-        description: i % 2 === 0
-          ? `${entity.name} is within 400m of a traditional market`
-          : `${entity.name} exceeds zone minimarket density limit`,
-        ruleType: i % 2 === 0 ? 'PROXIMITY' : 'DENSITY',
+        description: `${entity.name} melanggar aturan jarak < 500m dari pasar tradisional`,
+        ruleType: 'PROXIMITY',
         severity,
         status,
-        distanceM: Math.floor(Math.random() * 350) + 50,
+        distanceM: Math.floor(Math.random() * 450) + 10,
         entityId: entity.id,
         districtId: entity.districtId,
-        zoningRuleId: i % 2 === 0 ? rules[0].id : rules[2].id,
+        zoningRuleId: rules[0].id,
         detectedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
-        resolvedAt: status === 'RESOLVED' ? new Date() : null,
+        resolvedAt: null,
       },
     });
     vCount++;
 
-    // Flag the entity
-    if (status === 'ACTIVE') {
-      await prisma.entity.update({
-        where: { id: entity.id },
-        data: { isFlagged: true, complianceScore: Math.floor(Math.random() * 40) + 20 },
-      });
-    }
+    // Berikan bendera melanggar pada tabel entitas minimarketnya
+    await prisma.entity.update({
+      where: { id: entity.id },
+      data: { isFlagged: true, complianceScore: Math.floor(Math.random() * 40) + 20 },
+    });
   }
   console.log(`   ✅ Created ${vCount} violations`);
+  // console.log('⚠️  Generating violations...');
+  // const minimarkets = await prisma.entity.findMany({
+  //   where: { type: 'MINIMARKET' },
+  //   take: 50,
+  //   include: { district: true },
+  // });
 
-  // ── 7. Seed Audits ──
+  // let vCount = 0;
+  // for (let i = 0; i < Math.min(47, minimarkets.length); i++) {
+  //   const entity = minimarkets[i];
+  //   const code = `#V-${8800 + i}`;
+  //   const severity = i < 12 ? 'CRITICAL' : i < 25 ? 'WARNING' : 'ELEVATED';
+  //   const status = i < 35 ? 'ACTIVE' : 'RESOLVED';
+
+  //   await prisma.violation.create({
+  //     data: {
+  //       code,
+  //       description: i % 2 === 0
+  //         ? `${entity.name} is within 400m of a traditional market`
+  //         : `${entity.name} exceeds zone minimarket density limit`,
+  //       ruleType: i % 2 === 0 ? 'PROXIMITY' : 'DENSITY',
+  //       severity,
+  //       status,
+  //       distanceM: Math.floor(Math.random() * 350) + 50,
+  //       entityId: entity.id,
+  //       districtId: entity.districtId,
+  //       zoningRuleId: i % 2 === 0 ? rules[0].id : rules[2].id,
+  //       detectedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
+  //       resolvedAt: status === 'RESOLVED' ? new Date() : null,
+  //     },
+  //   });
+  //   vCount++;
+
+  //   if (status === 'ACTIVE') {
+  //     await prisma.entity.update({
+  //       where: { id: entity.id },
+  //       data: { isFlagged: true, complianceScore: Math.floor(Math.random() * 40) + 20 },
+  //     });
+  //   }
+  // }
+  // console.log(`   ✅ Created ${vCount} violations`);
+
+  // ── 7. Seed Audits (programmatic) ──
   console.log('📋 Seeding audits...');
   const auditEntities = minimarkets.slice(0, 20);
   for (let i = 0; i < auditEntities.length; i++) {
@@ -358,14 +324,14 @@ async function main() {
   }
   console.log(`   ✅ Created ${auditEntities.length} audits`);
 
-  // ── 8. Seed Saturation Logs (4 weeks of history) ──
+  // ── 8. Seed Saturation Logs — 4 weeks of history per district ──
   console.log('📊 Seeding saturation history...');
   let logCount = 0;
   for (const [name, district] of Object.entries(districtMap)) {
-    const baseSaturation = DISTRICT_META[name].saturation;
+    const baseSaturation = districtSaturation[name];
     for (let week = 0; week < 4; week++) {
       const date = new Date();
-      date.setDate(date.getDate() - (week * 7));
+      date.setDate(date.getDate() - week * 7);
       await prisma.saturationLog.create({
         data: {
           saturationPercent: baseSaturation + (Math.random() * 10 - 5),
@@ -379,74 +345,60 @@ async function main() {
   }
   console.log(`   ✅ Created ${logCount} saturation log entries`);
 
-  // ── 9. Seed Flagged Clusters ──
+  // ── 9. Seed Flagged Clusters (from flagged_clusters.csv) ──
   console.log('🔴 Seeding flagged clusters...');
-  const clusterData = [
-    { district: 'Setiabudi', street: 'Jl. Rasuna Said', desc: '8 unzoned commercial entities within 200m', count: 8 },
-    { district: 'Jagakarsa', street: 'Jl. Raya Jagakarsa', desc: '12 minimarkets exceeding zone capacity', count: 12 },
-    { district: 'Kebayoran Lama', street: 'Jl. Cipulir Raya', desc: '6 Alfamart/Indomaret within 100m radius', count: 6 },
-    { district: 'Kebayoran Baru', street: 'Jl. Senopati', desc: '5 retail stores near Pasar Santa', count: 5 },
-    { district: 'Pesanggrahan', street: 'Jl. Bintaro Utama', desc: '9 minimarkets in residential zone', count: 9 },
-    { district: 'Tebet', street: 'Jl. Tebet Raya', desc: '4 stores violating proximity to Pasar Tebet', count: 4 },
-    { district: 'Pancoran', street: 'Jl. Kalibata Raya', desc: '7 unzoned commercial near Pasar Kalibata', count: 7 },
-    { district: 'Mampang Prapatan', street: 'Jl. Mampang Prapatan', desc: '42 unzoned commercial', count: 42 },
-  ];
+  const clusterRows = readCSV(DATA('flagged_clusters.csv'));
+  let clusterCount = 0;
 
-  for (const c of clusterData) {
-    const dist = districtMap[c.district];
-    if (!dist) continue;
+  for (const row of clusterRows) {
+    const dist = districtMap[row.district];
+    if (!dist) { console.warn(`   ⚠️  District "${row.district}" not found, skipping cluster`); continue; }
     await prisma.flaggedCluster.create({
       data: {
-        streetName: c.street,
-        description: c.desc,
-        entityCount: c.count,
+        streetName: row.streetName,
+        description: row.description,
+        entityCount: parseInt(row.entityCount),
         districtId: dist.id,
       },
     });
+    clusterCount++;
   }
-  console.log(`   ✅ Created ${clusterData.length} flagged clusters`);
+  console.log(`   ✅ Created ${clusterCount} flagged clusters`);
 
-  // ── 10. Seed AI Forecasts ──
+  // ── 10. Seed AI Forecasts (from ai_forecasts.csv) ──
   console.log('🤖 Seeding AI forecasts...');
-  const forecastData = [
-    { district: 'Tebet', prob: 92, pred: 'Minimarket saturation projected to exceed critical threshold. Recommend moratorium on new permits.', months: 6 },
-    { district: 'Setiabudi', prob: 88, pred: 'High density zone reaching capacity. Enforcement action recommended within 3 months.', months: 3 },
-    { district: 'Jagakarsa', prob: 76, pred: 'Moderate growth trajectory. Monitor Lenteng Agung corridor for emerging clusters.', months: 6 },
-  ];
+  const forecastRows = readCSV(DATA('ai_forecasts.csv'));
+  let forecastCount = 0;
 
-  for (const f of forecastData) {
-    const dist = districtMap[f.district];
-    if (!dist) continue;
+  for (const row of forecastRows) {
+    const dist = districtMap[row.district];
+    if (!dist) { console.warn(`   ⚠️  District "${row.district}" not found, skipping forecast`); continue; }
     await prisma.aiForecast.create({
       data: {
-        probability: f.prob,
-        prediction: f.pred,
-        timeframeMonths: f.months,
+        probability: parseInt(row.probability),
+        prediction: row.prediction,
+        timeframeMonths: parseInt(row.timeframeMonths),
         districtId: dist.id,
       },
     });
+    forecastCount++;
   }
-  console.log(`   ✅ Created ${forecastData.length} AI forecasts`);
+  console.log(`   ✅ Created ${forecastCount} AI forecasts`);
 
-  // ── 11. Seed System Settings ──
+  // ── 11. Seed System Settings (from system_settings.csv) ──
   console.log('⚙️  Seeding system settings...');
-  const settings = [
-    { key: 'defaultBasemap', value: 'satellite-streets' },
-    { key: 'telemetryZoom', value: 14 },
-    { key: 'auditRadiusRings', value: true },
-    { key: 'alertCriticalViolations', value: true },
-    { key: 'alertAuditSync', value: true },
-    { key: 'alertEngineUpdates', value: false },
-    { key: 'interfaceTheme', value: 'dark' },
-    { key: 'lastSyncAt', value: new Date().toISOString() },
-  ];
+  const settingRows = readCSV(DATA('system_settings.csv'));
+  let settingCount = 0;
 
-  for (const s of settings) {
+  for (const row of settingRows) {
+    // Replace $NOW$ sentinel with the current ISO timestamp
+    const rawValue = row.value === '$NOW$' ? new Date().toISOString() : row.value;
     await prisma.systemSetting.create({
-      data: { key: s.key, value: s.value },
+      data: { key: row.key, value: parseValue(rawValue) },
     });
+    settingCount++;
   }
-  console.log(`   ✅ Created ${settings.length} system settings`);
+  console.log(`   ✅ Created ${settingCount} system settings`);
 
   // ── Summary ──
   const counts = {
