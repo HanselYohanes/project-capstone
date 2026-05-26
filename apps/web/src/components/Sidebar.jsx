@@ -108,6 +108,11 @@ const Sidebar = () => {
             <span className="material-symbols-outlined">warning</span>
             <span className="font-medium text-sm">Violations</span>
           </NavLink>
+
+          <NavLink to="/calculator" className={({ isActive }) => isActive ? activeLinkClass : inactiveLinkClass}>
+            <span className="material-symbols-outlined">calculate</span>
+            <span className="font-medium text-sm">Kalkulator Jarak</span>
+          </NavLink>
         </div>
 
         {/* CTA */}

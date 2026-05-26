@@ -6,6 +6,7 @@ import MapView from './pages/MapView';
 import Analytics from './pages/Analytics';
 import Rankings from './pages/Rankings';
 import ViolationsPage from "./pages/ViolationsPage";
+import Calculator from "./pages/calculator/Calculator";
 
 // 🔥 TAMBAHAN
 import Login from "./pages/Login";
@@ -51,6 +52,9 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* 🧮 KALKULATOR JARAK (Haversine) */}
+        <Route path="/calculator" element={<Calculator />} />
       </Route>
 
     </Routes>
