@@ -12,13 +12,21 @@ import analyticsRoutes from './routes/analytics.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 import searchRoutes from './routes/search.routes.js';
 import authRoutes from './routes/auth.routes.js';
+import testRoutes from './routes/test.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
 // ─── Middleware ──────────────────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: false }));
-app.use(cors({ origin: ['http://localhost:5173', 'http://localhost:5174'], credentials: true }));
+
+app.use(
+  cors({
+    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 app.use(morgan('dev'));
 
@@ -32,14 +40,33 @@ app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/auth', authRoutes);
 
+// route untuk test middleware authenticate dan isAdmin
+app.use('/api/v1/test', testRoutes);
+
 // ─── Health Check ───────────────────────────────────────
 app.get('/api/v1/health', (req, res) => {
-  res.json({ success: true, data: { status: 'ok', timestamp: new Date().toISOString() } });
+  res.json({
+    success: true,
+    data: {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+    },
+  });
+});
+
+// ─── 404 Handler ────────────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route tidak ditemukan',
+    path: req.originalUrl,
+  });
 });
 
 // ─── Error Handler ──────────────────────────────────────
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err.message);
+
   res.status(err.status || 500).json({
     success: false,
     error: err.message || 'Internal Server Error',
@@ -50,5 +77,7 @@ app.use((err, req, res, next) => {
 app.listen(PORT, () => {
   console.log(`\n🚀 Zonify API running at http://localhost:${PORT}`);
   console.log(`📡 API Base: http://localhost:${PORT}/api/v1`);
-  console.log(`💚 Health:   http://localhost:${PORT}/api/v1/health\n`);
+  console.log(`💚 Health:   http://localhost:${PORT}/api/v1/health`);
+  console.log(`🔐 Auth:     http://localhost:${PORT}/api/v1/auth`);
+  console.log(`🧪 Test:     http://localhost:${PORT}/api/v1/test\n`);
 });
