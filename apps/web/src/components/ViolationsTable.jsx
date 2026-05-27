@@ -4,11 +4,11 @@ import { useAuth } from '../context/AuthContext';
 
 // ─── Static sample data ──────────────────────────────────────────────────────
 const RECENT_ROWS = [
-  { id: 'V-8821', entity: 'Indomaret Point',  district: 'Cilandak',      rule: '< 400m from Pasar',      ruleColor: 'bg-error',     statusLabel: 'Critical',  statusClass: 'bg-error-container text-error outline-error/20' },
-  { id: 'V-8820', entity: 'Alfamart Express', district: 'Tebet',         rule: '< 400m from Pasar',      ruleColor: 'bg-error',     statusLabel: 'Critical',  statusClass: 'bg-error-container text-error outline-error/20' },
-  { id: 'V-8819', entity: 'Lawson',           district: 'Kebayoran Baru',rule: '< 100m from Minimarket', ruleColor: 'bg-tertiary',  statusLabel: 'Warning',   statusClass: 'bg-tertiary-container/30 text-tertiary outline-tertiary/20' },
-  { id: 'V-8818', entity: 'FamilyMart',       district: 'Setiabudi',     rule: 'Zone Capacity Exceeded', ruleColor: 'bg-tertiary',  statusLabel: 'Warning',   statusClass: 'bg-tertiary-container/30 text-tertiary outline-tertiary/20' },
-  { id: 'V-8817', entity: 'Circle K',         district: 'Pancoran',      rule: 'Resolved Post-Audit',    ruleColor: 'bg-[#10B981]', statusLabel: 'Resolved',  statusClass: 'bg-secondary-container text-on-surface outline-outline-variant/30' },
+  { id: 'V-8821', entity: 'Indomaret Point', district: 'Cilandak', rule: '< 400m from Pasar', ruleColor: 'bg-error', statusLabel: 'Critical', statusClass: 'bg-error-container text-error outline-error/20' },
+  { id: 'V-8820', entity: 'Alfamart Express', district: 'Tebet', rule: '< 400m from Pasar', ruleColor: 'bg-error', statusLabel: 'Critical', statusClass: 'bg-error-container text-error outline-error/20' },
+  { id: 'V-8819', entity: 'Lawson', district: 'Kebayoran Baru', rule: '< 100m from Minimarket', ruleColor: 'bg-tertiary', statusLabel: 'Warning', statusClass: 'bg-tertiary-container/30 text-tertiary outline-tertiary/20' },
+  { id: 'V-8818', entity: 'FamilyMart', district: 'Setiabudi', rule: 'Zone Capacity Exceeded', ruleColor: 'bg-tertiary', statusLabel: 'Warning', statusClass: 'bg-tertiary-container/30 text-tertiary outline-tertiary/20' },
+  { id: 'V-8817', entity: 'Circle K', district: 'Pancoran', rule: 'Resolved Post-Audit', ruleColor: 'bg-[#10B981]', statusLabel: 'Resolved', statusClass: 'bg-secondary-container text-on-surface outline-outline-variant/30' },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────

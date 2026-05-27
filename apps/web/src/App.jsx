@@ -11,7 +11,8 @@ import Calculator from "./pages/calculator/Calculator";
 // 🔥 TAMBAHAN
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import ProtectedRoute from "./components/ProtectedRoute";
+import ProtectedRoute, { RequireAuth, RequireAdmin } from "./components/ProtectedRoute";
+
 
 function App() {
   return (
@@ -56,6 +57,25 @@ function App() {
         {/* 🧮 KALKULATOR JARAK (Haversine) */}
         <Route path="/calculator" element={<Calculator />} />
       </Route>
+
+      {/* ─────────────────────────────────────────────────────────────
+          PANDUAN PENGGUNAAN SATPAM FRONTEND (Outlet Pattern)
+          Aktifkan blok ini jika ingin melindungi route dengan Outlet:
+
+          🔒 RequireAuth — Semua user yang sudah login:
+          <Route element={<RequireAuth />}>
+            <Route element={<Layout />}>
+              <Route path="/dashboard" element={<Dashboard />} />
+            </Route>
+          </Route>
+
+          🔐 RequireAdmin — Hanya Admin (isAdmin: true):
+          <Route element={<RequireAdmin />}>
+            <Route element={<Layout />}>
+              <Route path="/admin/settings" element={<AdminSettings />} />
+            </Route>
+          </Route>
+      ───────────────────────────────────────────────────────────── */}
 
     </Routes>
   );
