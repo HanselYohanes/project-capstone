@@ -34,7 +34,9 @@ export const AuthProvider = ({ children }) => {
                 id: json.data.id,
                 email: json.data.email,
                 name: json.data.username,   // field 'name' dipakai di Header
-                isAdmin: json.data.isAdmin ?? false,
+                roleId: json.data.roleId ?? 2,
+                role: json.data.role ?? { id: 2, name: 'user' },
+                isAdmin: json.data.isAdmin ?? (json.data.roleId === 1),
                 avatar: json.data.avatar || null,
                 token: json.token,
             };

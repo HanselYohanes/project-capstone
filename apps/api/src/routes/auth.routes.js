@@ -51,12 +51,16 @@ if (existingUsername) {
 // hash password
 const hashedPassword = await bcrypt.hash(password, 10);
 
-// simpan user
+// simpan user dengan role default (user = 2)
 const user = await prisma.user.create({
   data: {
     email,
     username,
     password: hashedPassword,
+    roleId: 2, // default role: user
+  },
+  include: {
+    role: true,
   },
 });
 
@@ -67,6 +71,8 @@ res.status(201).json({
     id: user.id,
     email: user.email,
     username: user.username,
+    roleId: user.roleId,
+    role: user.role,
     isAdmin: user.isAdmin,
   },
 });
@@ -97,10 +103,13 @@ if (!email || !password) {
   });
 }
 
-// cari user
+// cari user dengan role relationship
 const user = await prisma.user.findUnique({
   where: {
     email,
+  },
+  include: {
+    role: true,
   },
 });
 
@@ -136,6 +145,7 @@ const token = jwt.sign(
     id: user.id,
     email: user.email,
     isAdmin: user.isAdmin,
+    roleId: user.roleId,
   },
   process.env.JWT_SECRET,
   {
@@ -151,6 +161,8 @@ res.status(200).json({
     id: user.id,
     email: user.email,
     username: user.username,
+    roleId: user.roleId,
+    role: user.role,
     isAdmin: user.isAdmin,
   },
 });

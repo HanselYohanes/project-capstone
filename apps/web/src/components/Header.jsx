@@ -325,11 +325,11 @@ const Header = ({ onSearch }) => {
             <span className="text-sm font-semibold text-white">
               {user?.name || user?.email || "Guest"}
             </span>
-            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${user?.isAdmin
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${(user?.roleId === 1 || user?.isAdmin)
               ? "bg-violet-500/20 text-violet-300"
               : "bg-slate-500/20 text-slate-400"
               }`}>
-              {user?.isAdmin ? "Admin" : "User"}
+              {user?.role?.name ? user.role.name.toUpperCase() : (user?.isAdmin ? "Admin" : "User")}
             </span>
           </div>
         </button>

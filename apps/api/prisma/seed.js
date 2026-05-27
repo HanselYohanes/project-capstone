@@ -83,6 +83,24 @@ async function main() {
   await prisma.zoningRule.deleteMany();
   await prisma.district.deleteMany();
   await prisma.systemSetting.deleteMany();
+  await prisma.user.deleteMany();
+  await prisma.role.deleteMany();
+
+  // ── 1.5. Seed Roles ──
+  console.log('👥 Seeding roles...');
+  const adminRole = await prisma.role.create({
+    data: {
+      id: 1,
+      name: 'admin',
+    },
+  });
+  const userRole = await prisma.role.create({
+    data: {
+      id: 2,
+      name: 'user',
+    },
+  });
+  console.log(`   ✅ Created admin and user roles`);
 
   // ── 2. Seed Districts (from districts.csv) ──
   console.log('📍 Seeding districts...');

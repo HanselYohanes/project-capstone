@@ -211,6 +211,16 @@ model SystemSetting {
   @@map("system_settings")
 }
 
+// ─── Role Table ──────────────────────────────────────────
+
+model Role {
+  id    Int     @id @default(autoincrement())
+  name  String  @unique @db.VarChar(50)
+  users User[]
+
+  @@map("roles")
+}
+
 // ─── Users Table ─────────────────────────────────────────
 
 model User {
@@ -218,9 +228,12 @@ model User {
   email     String   @unique @db.VarChar(255)
   username  String   @unique @db.VarChar(100)
   password  String   @db.VarChar(255)
+  roleId    Int      @default(2)
   isAdmin   Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  role Role @relation(fields: [roleId], references: [id])
 
   @@map("users")
 }
