@@ -17,8 +17,18 @@ export const useStats = () => {
         const fetchKPIs = async () => {
             try {
                 setLoading(true);
-                const res = await fetch(`${API_BASE}/dashboard/kpis`);
-                if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
+                const savedUser = localStorage.getItem("user");
+                const token = savedUser ? JSON.parse(savedUser)?.token : null;
+                const headers = token
+                    ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
+                    : { "Content-Type": "application/json" };
+
+                const res = await fetch(`${API_BASE}/dashboard/kpis`, {
+                    headers,
+                });
+                if (!res.ok) {
+                    throw new Error(`HTTP error: ${res.status}`);
+                }
                 const json = await res.json();
                 const d = json.data;
 
