@@ -1,10 +1,20 @@
 import { Router } from 'express';
 import prisma from '../config/database.js';
+import { authenticate } from '../middlewares/auth.middleware.js';
+import { isAdmin } from '../middlewares/role.middleware.js';
 
 const router = Router();
 
-// GET /api/v1/dashboard/kpis
-router.get('/kpis', async (req, res, next) => {
+const generateAuditCode = () => {
+  const random = Math.floor(1000 + Math.random() * 9000);
+  return `#MZ-${Date.now()}-${random}`;
+};
+
+const allowedViolationStatus = ['ACTIVE', 'UNDER_REVIEW', 'RESOLVED'];
+const allowedAuditPriority = ['HIGH', 'MEDIUM', 'LOW'];
+
+// ─── GET /api/v1/dashboard/kpis ─────────────────────────
+router.get('/kpis', authenticate, async (req, res, next) => {
   try {
     const [
       totalPasar,
@@ -30,9 +40,8 @@ router.get('/kpis', async (req, res, next) => {
       prisma.entity.count({ where: { permitStatus: 'APPROVED' } }),
     ]);
 
-    const permitApprovalRate = totalEntities > 0
-      ? Math.round((approvedPermits / totalEntities) * 100)
-      : 0;
+    const permitApprovalRate =
+      totalEntities > 0 ? Math.round((approvedPermits / totalEntities) * 100) : 0;
 
     res.json({
       success: true,
@@ -80,8 +89,8 @@ router.get('/kpis', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/dashboard/heatmap
-router.get('/heatmap', async (req, res, next) => {
+// ─── GET /api/v1/dashboard/heatmap ──────────────────────
+router.get('/heatmap', authenticate, async (req, res, next) => {
   try {
     const districts = await prisma.district.findMany({
       select: {
@@ -105,17 +114,17 @@ router.get('/heatmap', async (req, res, next) => {
       },
     });
 
-    const data = districts.map(d => ({
-      id: d.id,
-      name: d.name,
-      code: d.code,
-      latitude: d.latitude,
-      longitude: d.longitude,
-      saturationPercent: d.saturationPercent,
-      status: d.status,
-      entityCount: d._count.entities,
-      violationCount: d._count.violations,
-      auditCount: d._count.audits,
+    const data = districts.map((district) => ({
+      id: district.id,
+      name: district.name,
+      code: district.code,
+      latitude: district.latitude,
+      longitude: district.longitude,
+      saturationPercent: district.saturationPercent,
+      status: district.status,
+      entityCount: district._count.entities,
+      violationCount: district._count.violations,
+      auditCount: district._count.audits,
     }));
 
     res.json({
@@ -127,8 +136,8 @@ router.get('/heatmap', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/dashboard/forecast
-router.get('/forecast', async (req, res, next) => {
+// ─── GET /api/v1/dashboard/forecast ─────────────────────
+router.get('/forecast', authenticate, async (req, res, next) => {
   try {
     const forecasts = await prisma.aiForecast.findMany({
       orderBy: {
@@ -155,8 +164,8 @@ router.get('/forecast', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/dashboard/top-districts
-router.get('/top-districts', async (req, res, next) => {
+// ─── GET /api/v1/dashboard/top-districts ────────────────
+router.get('/top-districts', authenticate, async (req, res, next) => {
   try {
     const districts = await prisma.district.findMany({
       orderBy: {
@@ -178,14 +187,14 @@ router.get('/top-districts', async (req, res, next) => {
       },
     });
 
-    const data = districts.map(d => ({
-      id: d.id,
-      name: d.name,
-      code: d.code,
-      saturationPercent: d.saturationPercent,
-      status: d.status,
-      entityCount: d._count.entities,
-      violationCount: d._count.violations,
+    const data = districts.map((district) => ({
+      id: district.id,
+      name: district.name,
+      code: district.code,
+      saturationPercent: district.saturationPercent,
+      status: district.status,
+      entityCount: district._count.entities,
+      violationCount: district._count.violations,
     }));
 
     res.json({
@@ -197,8 +206,8 @@ router.get('/top-districts', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/dashboard/recent-violations
-router.get('/recent-violations', async (req, res, next) => {
+// ─── GET /api/v1/dashboard/recent-violations ────────────
+router.get('/recent-violations', authenticate, async (req, res, next) => {
   try {
     const violations = await prisma.violation.findMany({
       orderBy: {
@@ -214,6 +223,7 @@ router.get('/recent-violations', async (req, res, next) => {
         status: true,
         distanceM: true,
         detectedAt: true,
+        resolvedAt: true,
         entity: {
           select: {
             id: true,
@@ -241,8 +251,145 @@ router.get('/recent-violations', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/dashboard/entity-summary
-router.get('/entity-summary', async (req, res, next) => {
+// ─── PATCH /api/v1/dashboard/recent-violations/:id/action ─
+// hanya admin boleh mengubah action/status recent violations
+router.patch(
+  '/recent-violations/:id/action',
+  authenticate,
+  isAdmin,
+  async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { action, status } = req.body;
+
+      let nextStatus = status;
+
+      if (!nextStatus && action) {
+        const normalizedAction = String(action).toUpperCase();
+
+        if (normalizedAction === 'RESOLVE' || normalizedAction === 'RESOLVED') {
+          nextStatus = 'RESOLVED';
+        } else if (
+          normalizedAction === 'REVIEW' ||
+          normalizedAction === 'UNDER_REVIEW'
+        ) {
+          nextStatus = 'UNDER_REVIEW';
+        } else if (
+          normalizedAction === 'REOPEN' ||
+          normalizedAction === 'ACTIVE'
+        ) {
+          nextStatus = 'ACTIVE';
+        }
+      }
+
+      if (!nextStatus) {
+        return res.status(400).json({
+          success: false,
+          message: 'Status/action wajib diisi',
+          allowedAction: ['RESOLVE', 'REVIEW', 'REOPEN'],
+          allowedStatus: allowedViolationStatus,
+        });
+      }
+
+      nextStatus = String(nextStatus).toUpperCase();
+
+      if (!allowedViolationStatus.includes(nextStatus)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Status violation tidak valid',
+          allowedStatus: allowedViolationStatus,
+        });
+      }
+
+      const existingViolation = await prisma.violation.findUnique({
+        where: {
+          id,
+        },
+        include: {
+          entity: true,
+          district: true,
+        },
+      });
+
+      if (!existingViolation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Violation tidak ditemukan',
+        });
+      }
+
+      const updatedViolation = await prisma.violation.update({
+        where: {
+          id,
+        },
+        data: {
+          status: nextStatus,
+          resolvedAt: nextStatus === 'RESOLVED' ? new Date() : null,
+        },
+        include: {
+          entity: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              address: true,
+              isFlagged: true,
+            },
+          },
+          district: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+            },
+          },
+        },
+      });
+
+      if (nextStatus === 'RESOLVED') {
+        const activeViolationCount = await prisma.violation.count({
+          where: {
+            entityId: existingViolation.entityId,
+            status: {
+              in: ['ACTIVE', 'UNDER_REVIEW'],
+            },
+          },
+        });
+
+        if (activeViolationCount === 0) {
+          await prisma.entity.update({
+            where: {
+              id: existingViolation.entityId,
+            },
+            data: {
+              isFlagged: false,
+            },
+          });
+        }
+      } else {
+        await prisma.entity.update({
+          where: {
+            id: existingViolation.entityId,
+          },
+          data: {
+            isFlagged: true,
+          },
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Action recent violation berhasil diubah',
+        data: updatedViolation,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// ─── GET /api/v1/dashboard/entity-summary ───────────────
+router.get('/entity-summary', authenticate, async (req, res, next) => {
   try {
     const result = await prisma.entity.groupBy({
       by: ['type'],
@@ -251,7 +398,7 @@ router.get('/entity-summary', async (req, res, next) => {
       },
     });
 
-    const data = result.map(item => ({
+    const data = result.map((item) => ({
       type: item.type,
       count: item._count.type,
     }));
@@ -265,8 +412,8 @@ router.get('/entity-summary', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/dashboard/permit-summary
-router.get('/permit-summary', async (req, res, next) => {
+// ─── GET /api/v1/dashboard/permit-summary ───────────────
+router.get('/permit-summary', authenticate, async (req, res, next) => {
   try {
     const result = await prisma.entity.groupBy({
       by: ['permitStatus'],
@@ -275,7 +422,7 @@ router.get('/permit-summary', async (req, res, next) => {
       },
     });
 
-    const data = result.map(item => ({
+    const data = result.map((item) => ({
       status: item.permitStatus,
       count: item._count.permitStatus,
     }));
@@ -289,8 +436,8 @@ router.get('/permit-summary', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/dashboard/violation-summary
-router.get('/violation-summary', async (req, res, next) => {
+// ─── GET /api/v1/dashboard/violation-summary ────────────
+router.get('/violation-summary', authenticate, async (req, res, next) => {
   try {
     const [byStatus, bySeverity] = await Promise.all([
       prisma.violation.groupBy({
@@ -310,11 +457,11 @@ router.get('/violation-summary', async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        byStatus: byStatus.map(item => ({
+        byStatus: byStatus.map((item) => ({
           status: item.status,
           count: item._count.status,
         })),
-        bySeverity: bySeverity.map(item => ({
+        bySeverity: bySeverity.map((item) => ({
           severity: item.severity,
           count: item._count.severity,
         })),
@@ -325,8 +472,8 @@ router.get('/violation-summary', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/dashboard/audit-summary
-router.get('/audit-summary', async (req, res, next) => {
+// ─── GET /api/v1/dashboard/audit-summary ────────────────
+router.get('/audit-summary', authenticate, async (req, res, next) => {
   try {
     const [byPriority, byStatus] = await Promise.all([
       prisma.audit.groupBy({
@@ -346,11 +493,11 @@ router.get('/audit-summary', async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        byPriority: byPriority.map(item => ({
+        byPriority: byPriority.map((item) => ({
           priority: item.priority,
           count: item._count.priority,
         })),
-        byStatus: byStatus.map(item => ({
+        byStatus: byStatus.map((item) => ({
           status: item.status,
           count: item._count.status,
         })),
@@ -361,8 +508,196 @@ router.get('/audit-summary', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/dashboard/flagged-clusters
-router.get('/flagged-clusters', async (req, res, next) => {
+// ─── POST /api/v1/dashboard/audits ──────────────────────
+// hanya admin boleh membuat new audit
+router.post('/audits', authenticate, isAdmin, async (req, res, next) => {
+  try {
+    const {
+      entityId,
+      districtId,
+      priority = 'MEDIUM',
+      status = 'PENDING',
+      findings,
+    } = req.body;
+
+    if (!entityId) {
+      return res.status(400).json({
+        success: false,
+        message: 'entityId wajib diisi',
+      });
+    }
+
+    const normalizedPriority = String(priority).toUpperCase();
+
+    if (!allowedAuditPriority.includes(normalizedPriority)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Priority audit tidak valid',
+        allowedPriority: allowedAuditPriority,
+      });
+    }
+
+    const entity = await prisma.entity.findUnique({
+      where: {
+        id: entityId,
+      },
+      select: {
+        id: true,
+        name: true,
+        districtId: true,
+      },
+    });
+
+    if (!entity) {
+      return res.status(404).json({
+        success: false,
+        message: 'Entity tidak ditemukan',
+      });
+    }
+
+    const finalDistrictId = districtId || entity.districtId;
+
+    const district = await prisma.district.findUnique({
+      where: {
+        id: finalDistrictId,
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    if (!district) {
+      return res.status(404).json({
+        success: false,
+        message: 'District tidak ditemukan',
+      });
+    }
+
+    const audit = await prisma.audit.create({
+      data: {
+        code: generateAuditCode(),
+        priority: normalizedPriority,
+        status: String(status).toUpperCase(),
+        findings: findings || null,
+        entityId: entity.id,
+        districtId: district.id,
+        completedAt: String(status).toUpperCase() === 'COMPLETED' ? new Date() : null,
+      },
+      include: {
+        entity: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            address: true,
+          },
+        },
+        district: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Audit baru berhasil dibuat',
+      data: audit,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── PATCH /api/v1/dashboard/audits/:id/action ──────────
+// hanya admin boleh mengubah action/status audit
+router.patch('/audits/:id/action', authenticate, isAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { action, status, findings } = req.body;
+
+    let nextStatus = status;
+
+    if (!nextStatus && action) {
+      const normalizedAction = String(action).toUpperCase();
+
+      if (normalizedAction === 'COMPLETE' || normalizedAction === 'COMPLETED') {
+        nextStatus = 'COMPLETED';
+      } else if (normalizedAction === 'CANCEL' || normalizedAction === 'CANCELLED') {
+        nextStatus = 'CANCELLED';
+      } else if (normalizedAction === 'PENDING') {
+        nextStatus = 'PENDING';
+      } else if (normalizedAction === 'IN_PROGRESS') {
+        nextStatus = 'IN_PROGRESS';
+      }
+    }
+
+    if (!nextStatus) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status/action audit wajib diisi',
+      });
+    }
+
+    const existingAudit = await prisma.audit.findUnique({
+      where: {
+        id,
+      },
+    });
+
+    if (!existingAudit) {
+      return res.status(404).json({
+        success: false,
+        message: 'Audit tidak ditemukan',
+      });
+    }
+
+    const normalizedStatus = String(nextStatus).toUpperCase();
+
+    const audit = await prisma.audit.update({
+      where: {
+        id,
+      },
+      data: {
+        status: normalizedStatus,
+        findings: findings !== undefined ? findings : existingAudit.findings,
+        completedAt: normalizedStatus === 'COMPLETED' ? new Date() : null,
+      },
+      include: {
+        entity: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            address: true,
+          },
+        },
+        district: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Action audit berhasil diubah',
+      data: audit,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── GET /api/v1/dashboard/flagged-clusters ─────────────
+router.get('/flagged-clusters', authenticate, async (req, res, next) => {
   try {
     const clusters = await prisma.flaggedCluster.findMany({
       orderBy: {
@@ -389,8 +724,8 @@ router.get('/flagged-clusters', async (req, res, next) => {
   }
 });
 
-// GET /api/v1/dashboard/map-entities
-router.get('/map-entities', async (req, res, next) => {
+// ─── GET /api/v1/dashboard/map-entities ─────────────────
+router.get('/map-entities', authenticate, async (req, res, next) => {
   try {
     const entities = await prisma.entity.findMany({
       select: {
@@ -403,6 +738,8 @@ router.get('/map-entities', async (req, res, next) => {
         permitStatus: true,
         complianceScore: true,
         isFlagged: true,
+        store: true,
+        kelurahan: true,
         district: {
           select: {
             id: true,
@@ -422,33 +759,287 @@ router.get('/map-entities', async (req, res, next) => {
   }
 });
 
+// HANYA ADMIN: ubah action recent violations dashboard
+router.patch(
+  '/recent-violations/:id/action',
+  authenticate,
+  isAdmin,
+  async (req, res, next) => {
+    try {
+      const { id } = req.params;
+      const { action, status } = req.body;
 
+      let nextStatus = status;
 
-// GET /api/v1/dashboard/top-districts
-router.get('/top-districts', async (req, res, next) => {
+      if (!nextStatus && action) {
+        const normalizedAction = String(action).toUpperCase();
+
+        if (normalizedAction === 'RESOLVE' || normalizedAction === 'RESOLVED') {
+          nextStatus = 'RESOLVED';
+        }
+
+        if (normalizedAction === 'REVIEW' || normalizedAction === 'UNDER_REVIEW') {
+          nextStatus = 'UNDER_REVIEW';
+        }
+
+        if (normalizedAction === 'REOPEN' || normalizedAction === 'ACTIVE') {
+          nextStatus = 'ACTIVE';
+        }
+      }
+
+      if (!nextStatus) {
+        return res.status(400).json({
+          success: false,
+          message: 'Action/status wajib diisi',
+        });
+      }
+
+      nextStatus = String(nextStatus).toUpperCase();
+
+      const allowedStatus = ['ACTIVE', 'UNDER_REVIEW', 'RESOLVED'];
+
+      if (!allowedStatus.includes(nextStatus)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Status tidak valid',
+          allowedStatus,
+        });
+      }
+
+      const violation = await prisma.violation.findUnique({
+        where: {
+          id,
+        },
+      });
+
+      if (!violation) {
+        return res.status(404).json({
+          success: false,
+          message: 'Violation tidak ditemukan',
+        });
+      }
+
+      const updatedViolation = await prisma.violation.update({
+        where: {
+          id,
+        },
+        data: {
+          status: nextStatus,
+          resolvedAt: nextStatus === 'RESOLVED' ? new Date() : null,
+        },
+        include: {
+          entity: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              address: true,
+              isFlagged: true,
+            },
+          },
+          district: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+            },
+          },
+        },
+      });
+
+      if (nextStatus === 'RESOLVED') {
+        const activeViolationCount = await prisma.violation.count({
+          where: {
+            entityId: violation.entityId,
+            status: {
+              in: ['ACTIVE', 'UNDER_REVIEW'],
+            },
+          },
+        });
+
+        if (activeViolationCount === 0) {
+          await prisma.entity.update({
+            where: {
+              id: violation.entityId,
+            },
+            data: {
+              isFlagged: false,
+            },
+          });
+        }
+      } else {
+        await prisma.entity.update({
+          where: {
+            id: violation.entityId,
+          },
+          data: {
+            isFlagged: true,
+          },
+        });
+      }
+
+      res.json({
+        success: true,
+        message: 'Action recent violation berhasil diubah',
+        data: updatedViolation,
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+// HANYA ADMIN: new audit
+router.post('/audits', authenticate, isAdmin, async (req, res, next) => {
   try {
-    const districts = await prisma.district.findMany({
-      orderBy: { saturationPercent: 'desc' },
-      take: 5,
-      select: { name: true, saturationPercent: true, status: true },
-    });
-    res.json({ success: true, data: districts });
-  } catch (err) { next(err); }
-});
+    const {
+      entityId,
+      districtId,
+      priority = 'MEDIUM',
+      status = 'PENDING',
+      findings,
+    } = req.body;
 
-// GET /api/v1/dashboard/recent-violations
-router.get('/recent-violations', async (req, res, next) => {
-  try {
-    const violations = await prisma.violation.findMany({
-      orderBy: { detectedAt: 'desc' },
-      take: 10,
-      include: {
-        entity: { select: { name: true, type: true } },
-        district: { select: { name: true } },
+    if (!entityId) {
+      return res.status(400).json({
+        success: false,
+        message: 'entityId wajib diisi',
+      });
+    }
+
+    const entity = await prisma.entity.findUnique({
+      where: {
+        id: entityId,
+      },
+      select: {
+        id: true,
+        name: true,
+        districtId: true,
       },
     });
-    res.json({ success: true, data: violations });
-  } catch (err) { next(err); }
+
+    if (!entity) {
+      return res.status(404).json({
+        success: false,
+        message: 'Entity tidak ditemukan',
+      });
+    }
+
+    const finalDistrictId = districtId || entity.districtId;
+
+    const district = await prisma.district.findUnique({
+      where: {
+        id: finalDistrictId,
+      },
+    });
+
+    if (!district) {
+      return res.status(404).json({
+        success: false,
+        message: 'District tidak ditemukan',
+      });
+    }
+
+    const audit = await prisma.audit.create({
+      data: {
+        code: `#AUD-${Date.now()}`,
+        priority: String(priority).toUpperCase(),
+        status: String(status).toUpperCase(),
+        findings: findings || null,
+        entityId: entity.id,
+        districtId: district.id,
+        completedAt:
+          String(status).toUpperCase() === 'COMPLETED' ? new Date() : null,
+      },
+      include: {
+        entity: true,
+        district: true,
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Audit baru berhasil dibuat',
+      data: audit,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// HANYA ADMIN: action audit
+router.patch('/audits/:id/action', authenticate, isAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { action, status, findings } = req.body;
+
+    let nextStatus = status;
+
+    if (!nextStatus && action) {
+      const normalizedAction = String(action).toUpperCase();
+
+      if (normalizedAction === 'COMPLETE' || normalizedAction === 'COMPLETED') {
+        nextStatus = 'COMPLETED';
+      }
+
+      if (normalizedAction === 'CANCEL' || normalizedAction === 'CANCELLED') {
+        nextStatus = 'CANCELLED';
+      }
+
+      if (normalizedAction === 'PENDING') {
+        nextStatus = 'PENDING';
+      }
+
+      if (normalizedAction === 'IN_PROGRESS') {
+        nextStatus = 'IN_PROGRESS';
+      }
+    }
+
+    if (!nextStatus) {
+      return res.status(400).json({
+        success: false,
+        message: 'Action/status audit wajib diisi',
+      });
+    }
+
+    const existingAudit = await prisma.audit.findUnique({
+      where: {
+        id,
+      },
+    });
+
+    if (!existingAudit) {
+      return res.status(404).json({
+        success: false,
+        message: 'Audit tidak ditemukan',
+      });
+    }
+
+    const normalizedStatus = String(nextStatus).toUpperCase();
+
+    const audit = await prisma.audit.update({
+      where: {
+        id,
+      },
+      data: {
+        status: normalizedStatus,
+        findings: findings !== undefined ? findings : existingAudit.findings,
+        completedAt: normalizedStatus === 'COMPLETED' ? new Date() : null,
+      },
+      include: {
+        entity: true,
+        district: true,
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Action audit berhasil diubah',
+      data: audit,
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;

@@ -1,23 +1,57 @@
-export const isAdmin = (req, res, next) => {
+import prisma from '../config/database.js';
+
+export const isAdmin = async (req, res, next) => {
   try {
-    // pastikan user login
     if (!req.user) {
       return res.status(401).json({
-        message: "Unauthorized",
+        success: false,
+        message: 'Unauthorized - User belum login',
       });
     }
 
-    // cek apakah admin
-    if (!req.user.isAdmin) {
-      return res.status(403).json({
-        message: "Access denied - Admin only",
+    const user = await prisma.user.findUnique({
+      where: {
+        id: req.user.id,
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        roleId: true,
+        isAdmin: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized - User tidak ditemukan',
       });
     }
+
+    const adminAccess = user.isAdmin === true || user.roleId === 1;
+
+    if (!adminAccess) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied - Admin only',
+      });
+    }
+
+    req.user = {
+      ...req.user,
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      roleId: user.roleId,
+      isAdmin: adminAccess,
+    };
 
     next();
   } catch (error) {
     return res.status(500).json({
-      message: "Role middleware error",
+      success: false,
+      message: 'Role middleware error',
       error: error.message,
     });
   }

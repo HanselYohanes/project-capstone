@@ -13,6 +13,7 @@ import settingsRoutes from './routes/settings.routes.js';
 import searchRoutes from './routes/search.routes.js';
 import authRoutes from './routes/auth.routes.js';
 import testRoutes from './routes/test.routes.js';
+import zoningRoutes from './routes/zoning.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -39,6 +40,7 @@ app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/zoning', zoningRoutes);
 
 // route untuk test middleware authenticate dan isAdmin
 app.use('/api/v1/test', testRoutes);

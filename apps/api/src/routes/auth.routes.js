@@ -7,12 +7,51 @@ import prisma from '../config/database.js';
 
 const router = Router();
 
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
+const normalizeUsername = (username) => String(username || '').trim();
+
+const generateToken = (user) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET belum disetting di .env');
+  }
+
+  const isAdmin = user.roleId === 1 || user.isAdmin === true;
+
+  return jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      roleId: user.roleId,
+      isAdmin,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: '1d',
+    }
+  );
+};
+
+const userResponse = (user) => {
+  const isAdmin = user.roleId === 1 || user.isAdmin === true;
+
+  return {
+    id: user.id,
+    email: user.email,
+    username: user.username,
+    roleId: user.roleId,
+    role: user.role,
+    isAdmin,
+  };
+};
+
 // ─── REGISTER USER ──────────────────────────────────────
 router.post('/register', async (req, res) => {
   try {
-    const { email, username, password } = req.body;
+    const email = normalizeEmail(req.body.email);
+    const username = normalizeUsername(req.body.username);
+    const { password } = req.body;
 
-    // validasi input
     if (!email || !username || !password) {
       return res.status(400).json({
         success: false,
@@ -20,7 +59,6 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // cek email
     const existingEmail = await prisma.user.findUnique({
       where: {
         email,
@@ -34,7 +72,6 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // cek username
     const existingUsername = await prisma.user.findUnique({
       where: {
         username,
@@ -48,10 +85,8 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    // hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // simpan user biasa
     const user = await prisma.user.create({
       data: {
         email,
@@ -68,14 +103,7 @@ router.post('/register', async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Register user berhasil',
-      data: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        roleId: user.roleId,
-        role: user.role,
-        isAdmin: user.isAdmin,
-      },
+      data: userResponse(user),
     });
   } catch (error) {
     console.error('REGISTER ERROR:', error);
@@ -89,15 +117,14 @@ router.post('/register', async (req, res) => {
 });
 
 // ─── REGISTER ADMIN ─────────────────────────────────────
-// Route ini untuk testing/development.
-// Kalau sudah production, sebaiknya jangan dibuka bebas.
+// Route ini untuk development/testing.
+// Di production, sebaiknya admin dibuat lewat seeder/database.
 router.post('/register-admin', async (req, res) => {
   try {
-    const { email, username, password, adminSecret } = req.body;
+    const email = normalizeEmail(req.body.email);
+    const username = normalizeUsername(req.body.username);
+    const { password, adminSecret } = req.body;
 
-    // optional security
-    // isi ADMIN_SECRET di .env, misalnya:
-    // ADMIN_SECRET=superadmin123
     if (process.env.ADMIN_SECRET) {
       if (adminSecret !== process.env.ADMIN_SECRET) {
         return res.status(403).json({
@@ -107,7 +134,6 @@ router.post('/register-admin', async (req, res) => {
       }
     }
 
-    // validasi input
     if (!email || !username || !password) {
       return res.status(400).json({
         success: false,
@@ -115,7 +141,6 @@ router.post('/register-admin', async (req, res) => {
       });
     }
 
-    // cek email
     const existingEmail = await prisma.user.findUnique({
       where: {
         email,
@@ -129,7 +154,6 @@ router.post('/register-admin', async (req, res) => {
       });
     }
 
-    // cek username
     const existingUsername = await prisma.user.findUnique({
       where: {
         username,
@@ -143,10 +167,8 @@ router.post('/register-admin', async (req, res) => {
       });
     }
 
-    // hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // simpan admin
     const admin = await prisma.user.create({
       data: {
         email,
@@ -163,14 +185,7 @@ router.post('/register-admin', async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Register admin berhasil',
-      data: {
-        id: admin.id,
-        email: admin.email,
-        username: admin.username,
-        roleId: admin.roleId,
-        role: admin.role,
-        isAdmin: admin.isAdmin,
-      },
+      data: userResponse(admin),
     });
   } catch (error) {
     console.error('REGISTER ADMIN ERROR:', error);
@@ -186,11 +201,9 @@ router.post('/register-admin', async (req, res) => {
 // ─── LOGIN ──────────────────────────────────────────────
 router.post('/login', async (req, res) => {
   try {
-    console.log('BODY:', req.body);
+    const email = normalizeEmail(req.body.email);
+    const { password } = req.body;
 
-    const { email, password } = req.body;
-
-    // validasi
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -198,7 +211,6 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // cari user dengan role relationship
     const user = await prisma.user.findUnique({
       where: {
         email,
@@ -208,8 +220,6 @@ router.post('/login', async (req, res) => {
       },
     });
 
-    console.log('USER:', user);
-
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -217,10 +227,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    // cek password
     const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    console.log('PASSWORD VALID:', isPasswordValid);
 
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -229,43 +236,13 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    if (!process.env.JWT_SECRET) {
-      return res.status(500).json({
-        success: false,
-        message: 'JWT_SECRET belum disetting di .env',
-      });
-    }
-
-    // pastikan admin terbaca benar
-    const isAdmin = user.roleId === 1 || user.isAdmin === true;
-
-    // generate token
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        roleId: user.roleId,
-        isAdmin,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: '1d',
-      }
-    );
+    const token = generateToken(user);
 
     res.status(200).json({
       success: true,
       message: 'Login berhasil',
       token,
-      data: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        roleId: user.roleId,
-        role: user.role,
-        isAdmin,
-      },
+      data: userResponse(user),
     });
   } catch (error) {
     console.error('LOGIN ERROR FULL:', error);
