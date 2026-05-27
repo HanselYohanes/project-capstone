@@ -111,7 +111,7 @@ const Sidebar = () => {
 
           <NavLink to="/calculator" className={({ isActive }) => isActive ? activeLinkClass : inactiveLinkClass}>
             <span className="material-symbols-outlined">calculate</span>
-            <span className="font-medium text-sm">Kalkulator Jarak</span>
+            <span className="font-medium text-sm">Distance calculator</span>
           </NavLink>
         </div>
 

@@ -21,9 +21,9 @@ const calculateHaversineDistance = (lat1, lon1, lat2, lon2) => {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
+    Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) *
+    Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.round(R * c); // Jarak dalam meter
 };
@@ -84,7 +84,7 @@ const Calculator = () => {
                 <span className="material-symbols-outlined text-white text-lg">calculate</span>
               </div>
               <h1 className="font-headline text-3xl font-bold text-white tracking-tight">
-                Kalkulator Jarak Otomatis
+                Distance calculator
               </h1>
             </div>
             <p className="text-sm text-on-surface-variant mt-1 pl-12">
@@ -225,21 +225,18 @@ const Calculator = () => {
 
             {/* Status Utama */}
             <div
-              className={`rounded-xl p-6 border flex items-start gap-5 ${
-                isViolation
+              className={`rounded-xl p-6 border flex items-start gap-5 ${isViolation
                   ? 'bg-red-900/20 border-red-500/40 shadow-[0_0_30px_rgba(220,38,38,0.1)]'
                   : 'bg-green-900/20 border-green-500/40 shadow-[0_0_30px_rgba(34,197,94,0.1)]'
-              }`}
+                }`}
             >
               <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                  isViolation ? 'bg-red-500/20' : 'bg-green-500/20'
-                }`}
+                className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${isViolation ? 'bg-red-500/20' : 'bg-green-500/20'
+                  }`}
               >
                 <span
-                  className={`material-symbols-outlined text-2xl ${
-                    isViolation ? 'text-red-400' : 'text-green-400'
-                  }`}
+                  className={`material-symbols-outlined text-2xl ${isViolation ? 'text-red-400' : 'text-green-400'
+                    }`}
                 >
                   {isViolation ? 'gpp_bad' : 'verified'}
                 </span>
@@ -251,11 +248,10 @@ const Calculator = () => {
                     {results.input.nama}
                   </h3>
                   <span
-                    className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest ${
-                      isViolation
+                    className={`text-xs font-bold px-3 py-1 rounded-full uppercase tracking-widest ${isViolation
                         ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                         : 'bg-green-500/20 text-green-400 border border-green-500/30'
-                    }`}
+                      }`}
                   >
                     {isViolation ? '⚠ Melanggar Zonasi' : '✓ Aman'}
                   </span>
@@ -333,11 +329,10 @@ const Calculator = () => {
                         </td>
                         <td className="py-3.5 px-6 text-center">
                           <span
-                            className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${
-                              aman
+                            className={`text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider ${aman
                                 ? 'bg-green-500/15 text-green-400 border border-green-500/25'
                                 : 'bg-red-500/15 text-red-400 border border-red-500/25'
-                            }`}
+                              }`}
                           >
                             {aman ? 'Aman' : 'Melanggar'}
                           </span>

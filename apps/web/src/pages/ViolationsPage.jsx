@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useContext } from 'react';
+import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const API_BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:3001';
@@ -84,6 +87,8 @@ function normaliseRow(v) {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 const ViolationsPage = () => {
+    const { user } = useAuth();
+
     // ── KPI state ──
     const [summary, setSummary] = useState(FALLBACK_SUMMARY);
     const [summaryLoading, setSummaryLoading] = useState(true);
@@ -197,6 +202,107 @@ const ViolationsPage = () => {
     // Reset to page 1 when filters change
     useEffect(() => { setPage(1); }, [filterSeverity, filterStatus, search]);
 
+    // ─── Export handlers ────────────────────────────────────────────────────
+    const CSV_HEADERS = ['Kode', 'Entitas', 'Kecamatan', 'Aturan Zonasi', 'Jarak (M)', 'Severity', 'Status', 'Terdeteksi'];
+
+    // Helper: ambil SEMUA data yang sesuai filter aktif (bukan hanya 1 halaman).
+    // Jika API tersedia → fetch ulang dengan limit besar.
+    // Jika offline/fallback → filter FALLBACK_VIOLATIONS secara lokal.
+    const getAllExportData = async () => {
+        if (usingFallback) {
+            return FALLBACK_VIOLATIONS.filter(v => {
+                const matchSearch = !search || v.entityName.toLowerCase().includes(search.toLowerCase()) || v.district.toLowerCase().includes(search.toLowerCase());
+                const matchSeverity = !filterSeverity || v.severity === filterSeverity;
+                const matchStatus = !filterStatus || v.status === filterStatus;
+                return matchSearch && matchSeverity && matchStatus;
+            });
+        }
+        try {
+            const params = new URLSearchParams({
+                page: 1,
+                limit: 9999,
+                ...(filterSeverity && { severity: filterSeverity }),
+                ...(filterStatus && { status: filterStatus }),
+                ...(search && { search }),
+            });
+            const res = await fetch(`${API_BASE}/api/v1/violations?${params}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            const data = json?.data ?? [];
+            return data.length > 0 ? data.map(normaliseRow) : rows;
+        } catch (err) {
+            console.warn('[Export] Gagal fetch semua data, menggunakan halaman aktif:', err);
+            return rows; // graceful fallback ke halaman saat ini
+        }
+    };
+
+    const handleExportCSV = async () => {
+        const exportData = await getAllExportData();
+        const escapeCell = (val) => {
+            const str = val == null ? '' : String(val);
+            return str.includes(',') || str.includes('"') || str.includes('\n')
+                ? `"${str.replace(/"/g, '""')}"`
+                : str;
+        };
+        const headerRow = CSV_HEADERS.join(',');
+        const dataRows = exportData.map(r => [
+            r.code,
+            r.entityName,
+            r.district,
+            r.rule,
+            r.distanceM ?? '',
+            severityLabel(r.severity),
+            statusLabel(r.status),
+            r.detectedAt,
+        ].map(escapeCell).join(','));
+        const csvContent = [headerRow, ...dataRows].join('\n');
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', 'Laporan_Pelanggaran_Zonify.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleExportPDF = async () => {
+        const exportData = await getAllExportData();
+        const doc = new jsPDF({ orientation: 'landscape' });
+        const today = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' });
+
+        doc.setFontSize(16);
+        doc.setTextColor(40);
+        doc.text('Laporan Pelanggaran Zonasi - Zonify', 14, 16);
+        doc.setFontSize(9);
+        doc.setTextColor(120);
+        doc.text(`Diunduh pada: ${today}  |  Total data: ${exportData.length} baris`, 14, 23);
+
+        const tableBody = exportData.map(r => [
+            r.code,
+            r.entityName,
+            r.district,
+            r.rule,
+            r.distanceM ?? '-',
+            severityLabel(r.severity),
+            statusLabel(r.status),
+            r.detectedAt,
+        ]);
+
+        autoTable(doc, {
+            startY: 28,
+            head: [CSV_HEADERS],
+            body: tableBody,
+            styles: { fontSize: 8, cellPadding: 3 },
+            headStyles: { fillColor: [30, 30, 60], textColor: 255 },
+            alternateRowStyles: { fillColor: [245, 245, 250] },
+        });
+
+        doc.save('Laporan_Pelanggaran_Zonify.pdf');
+    };
+
+
     // ─── Render ────────────────────────────────────────────────────────────
     return (
         <div className="bg-background text-on-surface font-body min-h-screen antialiased">
@@ -221,11 +327,11 @@ const ViolationsPage = () => {
                     </div>
 
                     <div className="flex gap-3">
-                        <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-sm font-medium border border-outline-variant/20 transition-all">
+                        <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-sm font-medium border border-outline-variant/20 transition-all">
                             <span className="material-symbols-outlined text-sm">download</span>
                             CSV
                         </button>
-                        <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-sm font-medium border border-outline-variant/20 transition-all">
+                        <button onClick={handleExportPDF} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-sm font-medium border border-outline-variant/20 transition-all">
                             <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
                             PDF Report
                         </button>
@@ -358,6 +464,7 @@ const ViolationsPage = () => {
                                 <th className="py-4 px-5 text-xs text-on-surface-variant uppercase text-center">Severity</th>
                                 <th className="py-4 px-5 text-xs text-on-surface-variant uppercase text-center">Status</th>
                                 <th className="py-4 px-5 text-xs text-on-surface-variant uppercase">Terdeteksi</th>
+                                <th className="py-4 px-5 text-xs text-on-surface-variant uppercase text-center">Aksi</th>
                             </tr>
                         </thead>
 
@@ -381,13 +488,15 @@ const ViolationsPage = () => {
                                     <td className="py-3.5 px-5 text-center"><div className="h-5 w-20 rounded-full bg-white/10 mx-auto" /></td>
                                     {/* Terdeteksi */}
                                     <td className="py-3.5 px-5"><div className="h-3 w-20 rounded bg-white/10" /></td>
+                                    {/* Aksi skeleton */}
+                                    <td className="py-3.5 px-5"><div className="h-6 w-24 rounded bg-white/10 mx-auto" /></td>
                                 </tr>
                             ))}
 
                             {/* No data */}
                             {!tableLoading && rows.length === 0 && (
                                 <tr>
-                                    <td colSpan={8} className="py-12 text-center text-on-surface-variant">
+                                    <td colSpan={9} className="py-12 text-center text-on-surface-variant">
                                         Tidak ada data yang cocok dengan filter ini.
                                     </td>
                                 </tr>
@@ -421,6 +530,28 @@ const ViolationsPage = () => {
                                         </span>
                                     </td>
                                     <td className="py-3.5 px-5 text-on-surface-variant tabular-nums">{item.detectedAt}</td>
+                                    <td className="py-3.5 px-5 text-center">
+                                        {user?.isAdmin && (
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button
+                                                    title="Edit"
+                                                    onClick={() => alert(`Edit: ${item.code}`)}
+                                                    className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-500/15 text-blue-400 border border-blue-500/25 text-xs font-medium hover:bg-blue-500/30 transition-colors"
+                                                >
+                                                    <span className="material-symbols-outlined text-[13px]">edit</span>
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    title="Hapus"
+                                                    onClick={() => alert(`Hapus: ${item.code}`)}
+                                                    className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-error/15 text-error border border-error/25 text-xs font-medium hover:bg-error/30 transition-colors"
+                                                >
+                                                    <span className="material-symbols-outlined text-[13px]">delete</span>
+                                                    Hapus
+                                                </button>
+                                            </div>
+                                        )}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
