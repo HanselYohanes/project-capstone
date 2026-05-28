@@ -9,6 +9,10 @@ const Login = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
 
+    // -- UI state --
+    const [loading, setLoading] = useState(false);  // disable tombol & tampilkan teks loading
+    const [error, setError] = useState("");          // pesan error inline
+
     // 🔥 AUTO REDIRECT kalau sudah login
     useEffect(() => {
         if (user) {
@@ -18,24 +22,50 @@ const Login = () => {
 
     // 🔥 HANDLE LOGIN
     const handleLogin = async (e) => {
-        e.preventDefault();
+        e.preventDefault();        // cegah reload halaman
+        setError("");              // bersihkan error lama
+        setLoading(true);
 
-        const result = await login(email, password);
+        try {
+            // AuthContext.login() sudah menangani:
+            //   - fetch POST ke /api/v1/auth/login
+            //   - parsing JWT
+            //   - localStorage.setItem('user', ...)
+            //   - setUser(userData) secara global
+            const result = await login(email, password);
 
-        if (result.success) {
-            navigate("/"); // 🔥 langsung ke dashboard
-        } else {
-            alert(result.error || "Email / Password salah ❌");
+            if (result.success) {
+                // replace: true agar tombol Back tidak kembali ke halaman login
+                navigate("/dashboard", { replace: true });
+            } else {
+                setError(result.error || "Email atau password salah.");
+            }
+        } catch (err) {
+            console.error("[Login] unexpected error:", err);
+            setError("Tidak dapat terhubung ke server. Coba lagi.");
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#020817]">
-            <div className="bg-[#1e293b] p-6 rounded-xl w-80 shadow-lg">
+            {/* onSubmit di <form> agar Enter pun memicu login */}
+            <form
+                onSubmit={handleLogin}
+                className="bg-[#1e293b] p-6 rounded-xl w-80 shadow-lg"
+            >
 
                 <h2 className="text-white text-lg font-bold mb-4 text-center">
                     Login Admin
                 </h2>
+
+                {/* PESAN ERROR INLINE */}
+                {error && (
+                    <div className="mb-3 px-3 py-2 rounded bg-red-500/20 border border-red-500/40 text-red-400 text-sm text-center">
+                        {error}
+                    </div>
+                )}
 
                 {/* EMAIL */}
                 <input
@@ -43,7 +73,9 @@ const Login = () => {
                     placeholder="Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full mb-3 px-3 py-2 rounded bg-gray-300 text-black"
+                    disabled={loading}
+                    required
+                    className="w-full mb-3 px-3 py-2 rounded bg-gray-300 text-black disabled:opacity-60"
                 />
 
                 {/* PASSWORD */}
@@ -52,15 +84,18 @@ const Login = () => {
                     placeholder="Password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full mb-4 px-3 py-2 rounded bg-gray-300 text-black"
+                    disabled={loading}
+                    required
+                    className="w-full mb-4 px-3 py-2 rounded bg-gray-300 text-black disabled:opacity-60"
                 />
 
                 {/* BUTTON LOGIN */}
                 <button
-                    onClick={handleLogin}
-                    className="w-full bg-purple-400 py-2 rounded text-white font-semibold hover:opacity-90 transition"
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-purple-400 py-2 rounded text-white font-semibold hover:opacity-90 transition disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                    Login
+                    {loading ? "Memproses..." : "Login"}
                 </button>
 
                 {/* LINK KE REGISTER */}
@@ -74,7 +109,7 @@ const Login = () => {
                     </Link>
                 </p>
 
-            </div>
+            </form>
         </div>
     );
 };

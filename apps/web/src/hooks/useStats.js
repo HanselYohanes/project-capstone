@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 
-const API_BASE = "http://localhost:3001/api/v1";
+// 🔧 URL endpoint — sesuaikan via file .env (VITE_API_URL=http://localhost:3001)
+const API_BASE = `${import.meta.env.VITE_API_URL ?? "http://localhost:3001"}/api/v1`;
 
 export const useStats = () => {
     const [stats, setStats] = useState({

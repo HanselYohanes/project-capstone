@@ -50,13 +50,15 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_BASE}/api/v1/auth/register`, {
+
+      const res = await fetch(`${API_BASE}/api/v1/auth/register-admin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: form.name,
           email: form.email,
           password: form.password,
+          adminSecret: "ZonifyAdmin123"
         }),
       });
 

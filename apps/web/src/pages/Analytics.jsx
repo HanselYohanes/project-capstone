@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 
-const API_BASE = 'http://localhost:3001/api/v1';
+
+// 🔧 URL endpoint — sesuaikan via file .env (VITE_API_URL=http://localhost:3001)
+const API_BASE = `${import.meta.env.VITE_API_URL ?? 'http://localhost:3001'}/api/v1`;
 
 // ─── Data Fetching Hook ───────────────────────────────────
 function useAnalyticsData() {
+  const navigate = useNavigate();
   const [data, setData] = useState({
     kpis: null,
     saturation: [],
@@ -19,18 +23,46 @@ function useAnalyticsData() {
     const fetchAll = async () => {
       try {
         setLoading(true);
+
+        // 🔑 Ambil JWT dari localStorage (format sesuai AuthContext proyek ini)
+        const getAuthHeader = () => {
+          try {
+            const token = JSON.parse(localStorage.getItem('user'))?.token;
+            return token ? { Authorization: `Bearer ${token}` } : {};
+          } catch {
+            return {};
+          }
+        };
+
+        const headers = {
+          'Content-Type': 'application/json',
+          ...getAuthHeader(),
+        };
+
+        // 🌐 5 endpoint paralel — ubah path di sini jika routing backend berubah
         const [kpisRes, satRes, trendsRes, matrixRes, compRes] = await Promise.all([
-          fetch(`${API_BASE}/analytics/kpis`),
-          fetch(`${API_BASE}/analytics/saturation-by-district`),
-          fetch(`${API_BASE}/analytics/violation-trends`),
-          fetch(`${API_BASE}/analytics/ranking-matrix`),
-          fetch(`${API_BASE}/analytics/district-comparison`),
+          fetch(`${API_BASE}/analytics/kpis`, { headers }),
+          fetch(`${API_BASE}/analytics/saturation-by-district`, { headers }),
+          fetch(`${API_BASE}/analytics/violation-trends`, { headers }),
+          fetch(`${API_BASE}/analytics/ranking-matrix`, { headers }),
+          fetch(`${API_BASE}/analytics/district-comparison`, { headers }),
         ]);
+
+        // ⚠️ Tangani 401/403: sesi habis → bersihkan localStorage & redirect login
+        const responses = [kpisRes, satRes, trendsRes, matrixRes, compRes];
+        const unauthorized = responses.find(r => r.status === 401 || r.status === 403);
+        if (unauthorized) {
+          localStorage.removeItem('user');
+          localStorage.removeItem('token');
+          navigate('/login', { replace: true });
+          return;
+        }
 
         const [kpisJson, satJson, trendsJson, matrixJson, compJson] = await Promise.all([
           kpisRes.json(), satRes.json(), trendsRes.json(), matrixRes.json(), compRes.json(),
         ]);
 
+        // 🗂️ Data mapping — sesuaikan key di sini jika format JSON backend berubah
         // Override avgCompliance to 85.0 for consistency with the Dashboard view
         const kpisData = kpisJson.data ?? null;
         if (kpisData?.avgCompliance) {
@@ -39,10 +71,10 @@ function useAnalyticsData() {
 
         setData({
           kpis: kpisData,
-          saturation: satJson.data ?? [],
-          trends: trendsJson.data ?? [],
-          rankingMatrix: matrixJson.data ?? [],
-          comparison: compJson.data ?? [],
+          saturation: satJson.data ?? [],   // array { name, saturationPercent, status }
+          trends: trendsJson.data ?? [],   // array { commercial, residential }
+          rankingMatrix: matrixJson.data ?? [],   // array { districtName, severity, ... }
+          comparison: compJson.data ?? [],    // array { name, axes: { density, permits, ... } }
         });
       } catch (err) {
         setError(err.message);
@@ -52,7 +84,7 @@ function useAnalyticsData() {
     };
 
     fetchAll();
-  }, []);
+  }, [navigate]);
 
   return { data, loading, error };
 }
