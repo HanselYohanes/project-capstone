@@ -127,22 +127,51 @@ router.get('/trash', authenticate, isAdmin, async (req, res, next) => {
 });
 
 // ─── GET /api/v1/violations/:id ─────────────────────────
-router.get('/:id', authenticate, async (req, res, next) => {
+router.patch('/:id', authenticate, isAdmin, async (req, res, next) => {
   try {
-    const violation = await prisma.violation.findFirst({
-      where: { id: req.params.id, deletedAt: null }, // ← exclude soft deleted
-      include: {
-        entity: { include: { district: true } },
-        district: true,
-        zoningRule: true,
-      },
+    const {
+      status,
+      severity,
+      distanceM,
+    } = req.body;
+
+    const data = {};
+
+    if (status !== undefined)
+      data.status = normalizeUpper(status);
+
+    if (severity !== undefined)
+      data.severity = normalizeUpper(severity);
+
+    if (distanceM !== undefined)
+      data.distanceM = Number(distanceM);
+
+    const existing = await prisma.violation.findFirst({
+      where: {
+        id: req.params.id,
+        deletedAt: null
+      }
     });
 
-    if (!violation)
-      return res.status(404).json({ success: false, error: 'Violation not found' });
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        error: 'Violation not found'
+      });
+    }
 
-    res.json({ success: true, data: violation });
-  } catch (err) { next(err); }
+    const updated = await prisma.violation.update({
+      where: { id: req.params.id },
+      data
+    });
+
+    await updateEntityFlagStatus(updated.entityId);
+
+    res.json({ success: true, data: updated });
+
+  } catch (err) {
+    next(err);
+  }
 });
 
 // ─── PATCH /api/v1/violations/:id/resolve ───────────────
