@@ -69,7 +69,12 @@ export const useLocations = () => {
         let localData = [];
 
         try {
-            localData = JSON.parse(localStorage.getItem("locations")) || [];
+            const raw = JSON.parse(localStorage.getItem("locations")) || [];
+            // 🔥 Tambahkan prefix 'local-' agar ID tidak bentrok dengan retail/pasar/zonasi
+            localData = raw.map((item, index) => ({
+                ...item,
+                id: `local-${item.id ?? index}`,
+            }));
         } catch (e) {
             console.error("LocalStorage error:", e);
             localData = [];
@@ -82,9 +87,17 @@ export const useLocations = () => {
             ...localData,
         ];
 
-        console.log("✅ FINAL CLEAN LOCATIONS:", combined);
+        // 🔥 Deduplication: buang ID yang sama (ambil yang pertama)
+        const seen = new Set();
+        const deduped = combined.filter((loc) => {
+            if (seen.has(loc.id)) return false;
+            seen.add(loc.id);
+            return true;
+        });
 
-        setLocations(combined);
+        console.log("✅ FINAL CLEAN LOCATIONS:", deduped);
+
+        setLocations(deduped);
 
     }, []);
 

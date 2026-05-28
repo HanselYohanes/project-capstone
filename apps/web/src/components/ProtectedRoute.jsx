@@ -5,7 +5,9 @@ import { useAuth } from "../context/AuthContext";
 // Pelindung 1: Cek apakah user sudah login (token ada di localStorage).
 // Jika belum → redirect ke /login. Jika sudah → render halaman di dalamnya.
 export const RequireAuth = () => {
-    const token = localStorage.getItem('token');
+    // 🔥 FIX: AuthContext menyimpan token di dalam objek "user", BUKAN key "token" terpisah
+    const savedUser = localStorage.getItem('user');
+    const token = savedUser ? JSON.parse(savedUser)?.token : null;
 
     if (!token) {
         return <Navigate to="/login" replace />;
@@ -31,7 +33,9 @@ export const RequireAdmin = () => {
 // App.jsx yang sudah ada masih menggunakan pola <ProtectedRoute>{children}</ProtectedRoute>
 // Komponen ini menjaga kompatibilitas mundur agar routing lama tidak rusak.
 const ProtectedRoute = ({ children }) => {
-    const token = localStorage.getItem('token');
+    // 🔥 FIX: Baca token dari objek "user" di localStorage (sesuai AuthContext)
+    const savedUser = localStorage.getItem('user');
+    const token = savedUser ? JSON.parse(savedUser)?.token : null;
 
     if (!token) {
         return <Navigate to="/login" replace />;

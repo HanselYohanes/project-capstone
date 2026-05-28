@@ -4,11 +4,11 @@ const API_BASE = "http://localhost:3001/api/v1";
 
 export const useStats = () => {
     const [stats, setStats] = useState({
-        pasar: null,
-        total: null,
-        violations: null,
-        safe: null,
-        compliance: null,
+        pasar: 0,
+        total: 0,
+        violations: 0,
+        safe: 0,
+        compliance: 0,
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -32,16 +32,17 @@ export const useStats = () => {
                 const json = await res.json();
                 const d = json.data;
 
-                const totalMinimarket = d.totalMinimarket.value;
-                const activeViolations = d.activeViolations.value;
-                const safeCount = totalMinimarket - activeViolations;
+                // 🔥 Defensive check: pastikan property ada sebelum akses .value
+                const totalMinimarket = d?.totalMinimarket?.value ?? 0;
+                const activeViolations = d?.activeViolations?.value ?? 0;
+                const safeCount = Math.max(0, totalMinimarket - activeViolations);
                 const compliance =
                     totalMinimarket > 0
                         ? ((safeCount / totalMinimarket) * 100).toFixed(1)
-                        : 0;
+                        : "0.0";
 
                 setStats({
-                    pasar: d.totalPasar.value,
+                    pasar: d?.totalPasar?.value ?? 0,
                     total: totalMinimarket,
                     violations: activeViolations,
                     safe: safeCount,
