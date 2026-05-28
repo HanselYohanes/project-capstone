@@ -122,6 +122,7 @@ model Violation {
   zoningRuleId String?
   detectedAt   DateTime        @default(now())
   resolvedAt   DateTime?
+  deletedAt    DateTime?
 
   entity      Entity      @relation(fields: [entityId], references: [id])
   district    District    @relation(fields: [districtId], references: [id])
