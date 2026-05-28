@@ -44,14 +44,14 @@ export const getZoningMapPoints = async (req, res) => {
         markerColor: isPasar
           ? 'green'
           : e.isFlagged
-          ? 'red'
-          : e.store === 'Indomaret'
-          ? 'blue'
-          : e.store === 'Alfamart'
-          ? 'orange'
-          : isSupermarket
-          ? 'purple'
-          : 'gray',
+            ? 'red'
+            : e.store === 'Indomaret'
+              ? 'blue'
+              : e.store === 'Alfamart'
+                ? 'orange'
+                : isSupermarket
+                  ? 'purple'
+                  : 'gray',
         statusLabel: isPasar ? 'Pasar Tradisional' : e.isFlagged ? 'Berpotensi Melanggar' : 'Aman',
         popupTitle: e.name,
         popupSubtitle: isPasar ? `Pasar Tradisional - ${e.district?.name || '-'}` : `${e.store || e.type} - ${e.district?.name || '-'}`,
@@ -92,10 +92,19 @@ export const calculateZoningStatus = async (req, res) => {
     const minimumDistanceMeters = bodyRadius || zoningRule?.minDistanceMeters || DEFAULT_RADIUS;
     const ruleSource = bodyRadius ? 'REQUEST_BODY_RADIUS' : zoningRule ? 'DATABASE_ZONING_RULE' : 'DEFAULT_500_METERS';
 
-    const pasars = await prisma.entity.findMany({
-      where: { type: 'PASAR', latitude: { not: null }, longitude: { not: null } },
+    // 1. Ambil SEMUA data pasar tanpa filter 'where' dari database
+    // Ini akan menghindari error Prisma sama sekali
+    const allEntities = await prisma.entity.findMany({
+      where: { type: 'PASAR' },
       include: { district: { select: { id: true, name: true, code: true } } },
     });
+
+    // 2. Filter secara manual di kodingan (bukan di database)
+    const pasars = allEntities.filter(p => p.latitude != null && p.longitude != null);
+    // const pasars = await prisma.entity.findMany({
+    //   where: { type: 'PASAR', latitude: { not: null }, longitude: { not: null } },
+    //   include: { district: { select: { id: true, name: true, code: true } } },
+    // });
 
     if (!pasars.length) return res.status(404).json({ success: false, message: 'Data pasar tradisional belum tersedia' });
 
