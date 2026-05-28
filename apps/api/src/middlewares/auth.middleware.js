@@ -22,7 +22,17 @@ export const authenticate = (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.user = decoded;
+    req.user = {
+      ...decoded,
+      id: decoded.id || decoded.userId,
+    };
+
+    if (!req.user.id) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized - Token tidak memiliki user id',
+      });
+    }
 
     next();
   } catch (error) {

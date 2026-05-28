@@ -15,75 +15,41 @@ const updateEntityFlagStatus = async (entityId) => {
   const activeCount = await prisma.violation.count({
     where: {
       entityId,
-      status: {
-        in: ['ACTIVE', 'UNDER_REVIEW'],
-      },
+      deletedAt: null, // ← exclude soft deleted
+      status: { in: ['ACTIVE', 'UNDER_REVIEW'] },
     },
   });
-
   await prisma.entity.update({
-    where: {
-      id: entityId,
-    },
-    data: {
-      isFlagged: activeCount > 0,
-    },
+    where: { id: entityId },
+    data: { isFlagged: activeCount > 0 },
   });
 };
 
 // ─── GET /api/v1/violations ─────────────────────────────
-// user + admin boleh lihat
 router.get('/', authenticate, async (req, res, next) => {
   try {
-    const {
-      status,
-      severity,
-      ruleType,
-      districtId,
-      entityId,
-      search,
-      page = 1,
-      limit = 10,
-    } = req.query;
+    const { status, severity, ruleType, districtId, entityId, search, page = 1, limit = 10 } = req.query;
 
-    const where = {};
+    const where = { deletedAt: null }; // ← exclude soft deleted
 
     if (status) {
       const upperStatus = normalizeUpper(status);
-
-      if (!allowedStatuses.includes(upperStatus)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid violation status',
-        });
-      }
-
+      if (!allowedStatuses.includes(upperStatus))
+        return res.status(400).json({ success: false, error: 'Invalid violation status' });
       where.status = upperStatus;
     }
 
     if (severity) {
       const upperSeverity = normalizeUpper(severity);
-
-      if (!allowedSeverities.includes(upperSeverity)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid severity',
-        });
-      }
-
+      if (!allowedSeverities.includes(upperSeverity))
+        return res.status(400).json({ success: false, error: 'Invalid severity' });
       where.severity = upperSeverity;
     }
 
     if (ruleType) {
       const upperRuleType = normalizeUpper(ruleType);
-
-      if (!allowedRuleTypes.includes(upperRuleType)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid rule type',
-        });
-      }
-
+      if (!allowedRuleTypes.includes(upperRuleType))
+        return res.status(400).json({ success: false, error: 'Invalid rule type' });
       where.ruleType = upperRuleType;
     }
 
@@ -92,18 +58,8 @@ router.get('/', authenticate, async (req, res, next) => {
 
     if (search) {
       where.OR = [
-        {
-          code: {
-            contains: search,
-            mode: 'insensitive',
-          },
-        },
-        {
-          description: {
-            contains: search,
-            mode: 'insensitive',
-          },
-        },
+        { code: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
       ];
     }
 
@@ -113,675 +69,323 @@ router.get('/', authenticate, async (req, res, next) => {
 
     const [violations, total] = await Promise.all([
       prisma.violation.findMany({
-        where,
-        skip,
-        take: limitNumber,
+        where, skip, take: limitNumber,
         include: {
-          entity: {
-            select: {
-              id: true,
-              name: true,
-              type: true,
-              store: true,
-              address: true,
-            },
-          },
-          district: {
-            select: {
-              id: true,
-              name: true,
-              code: true,
-            },
-          },
-          zoningRule: {
-            select: {
-              id: true,
-              name: true,
-              ruleType: true,
-              minDistanceMeters: true,
-              maxEntitiesPerZone: true,
-            },
-          },
+          entity: { select: { id: true, name: true, type: true, store: true, address: true } },
+          district: { select: { id: true, name: true, code: true } },
+          zoningRule: { select: { id: true, name: true, ruleType: true, minDistanceMeters: true, maxEntitiesPerZone: true } },
         },
-        orderBy: {
-          detectedAt: 'desc',
-        },
+        orderBy: { detectedAt: 'desc' },
       }),
-      prisma.violation.count({
-        where,
-      }),
+      prisma.violation.count({ where }),
+    ]);
+
+    res.json({ success: true, data: violations, meta: { total, page: pageNumber, limit: limitNumber, totalPages: Math.ceil(total / limitNumber) } });
+  } catch (err) { next(err); }
+});
+
+// ─── GET /api/v1/violations/summary ─────────────────────
+router.get('/summary', authenticate, async (req, res, next) => {
+  try {
+    const baseWhere = { deletedAt: null }; // ← exclude soft deleted
+
+    const [byStatus, bySeverity, byRuleType, totalActive, totalResolved] = await Promise.all([
+      prisma.violation.groupBy({ by: ['status'], where: baseWhere, _count: { status: true } }),
+      prisma.violation.groupBy({ by: ['severity'], where: baseWhere, _count: { severity: true } }),
+      prisma.violation.groupBy({ by: ['ruleType'], where: baseWhere, _count: { ruleType: true } }),
+      prisma.violation.count({ where: { ...baseWhere, status: 'ACTIVE' } }),
+      prisma.violation.count({ where: { ...baseWhere, status: 'RESOLVED' } }),
     ]);
 
     res.json({
       success: true,
-      data: violations,
-      meta: {
-        total,
-        page: pageNumber,
-        limit: limitNumber,
-        totalPages: Math.ceil(total / limitNumber),
+      data: {
+        totalActive, totalResolved,
+        byStatus: byStatus.map(i => ({ status: i.status, count: i._count.status })),
+        bySeverity: bySeverity.map(i => ({ severity: i.severity, count: i._count.severity })),
+        byRuleType: byRuleType.map(i => ({ ruleType: i.ruleType, count: i._count.ruleType })),
       },
     });
-  } catch (err) {
-    next(err);
-  }
+  } catch (err) { next(err); }
 });
 
-// ─── GET /api/v1/violations/summary ─────────────────────
-// user + admin boleh lihat
-router.get('/summary', authenticate, async (req, res, next) => {
+// ─── GET /api/v1/violations/trash ───────────────────────
+// Admin only: lihat data yang sudah di-soft delete (recycle bin)
+router.get('/trash', authenticate, isAdmin, async (req, res, next) => {
   try {
-    const [byStatus, bySeverity, byRuleType, totalActive, totalResolved] =
-      await Promise.all([
-        prisma.violation.groupBy({
-          by: ['status'],
-          _count: {
-            status: true,
-          },
-        }),
-        prisma.violation.groupBy({
-          by: ['severity'],
-          _count: {
-            severity: true,
-          },
-        }),
-        prisma.violation.groupBy({
-          by: ['ruleType'],
-          _count: {
-            ruleType: true,
-          },
-        }),
-        prisma.violation.count({
-          where: {
-            status: 'ACTIVE',
-          },
-        }),
-        prisma.violation.count({
-          where: {
-            status: 'RESOLVED',
-          },
-        }),
-      ]);
-
-    res.json({
-      success: true,
-      data: {
-        totalActive,
-        totalResolved,
-        byStatus: byStatus.map((item) => ({
-          status: item.status,
-          count: item._count.status,
-        })),
-        bySeverity: bySeverity.map((item) => ({
-          severity: item.severity,
-          count: item._count.severity,
-        })),
-        byRuleType: byRuleType.map((item) => ({
-          ruleType: item.ruleType,
-          count: item._count.ruleType,
-        })),
+    const violations = await prisma.violation.findMany({
+      where: { deletedAt: { not: null } },
+      include: {
+        entity: { select: { id: true, name: true, type: true } },
+        district: { select: { id: true, name: true } },
       },
+      orderBy: { deletedAt: 'desc' },
     });
-  } catch (err) {
-    next(err);
-  }
+
+    res.json({ success: true, data: violations });
+  } catch (err) { next(err); }
 });
 
 // ─── GET /api/v1/violations/:id ─────────────────────────
-// user + admin boleh lihat detail
 router.get('/:id', authenticate, async (req, res, next) => {
   try {
-    const violation = await prisma.violation.findUnique({
-      where: {
-        id: req.params.id,
-      },
+    const violation = await prisma.violation.findFirst({
+      where: { id: req.params.id, deletedAt: null }, // ← exclude soft deleted
       include: {
-        entity: {
-          include: {
-            district: true,
-          },
-        },
+        entity: { include: { district: true } },
         district: true,
         zoningRule: true,
       },
     });
 
-    if (!violation) {
-      return res.status(404).json({
-        success: false,
-        error: 'Violation not found',
-      });
-    }
+    if (!violation)
+      return res.status(404).json({ success: false, error: 'Violation not found' });
 
-    res.json({
-      success: true,
-      data: violation,
-    });
-  } catch (err) {
-    next(err);
-  }
+    res.json({ success: true, data: violation });
+  } catch (err) { next(err); }
 });
 
 // ─── PATCH /api/v1/violations/:id/resolve ───────────────
-// hanya admin boleh resolve
 router.patch('/:id/resolve', authenticate, isAdmin, async (req, res, next) => {
   try {
-    const existingViolation = await prisma.violation.findUnique({
-      where: {
-        id: req.params.id,
-      },
-    });
-
-    if (!existingViolation) {
-      return res.status(404).json({
-        success: false,
-        error: 'Violation not found',
-      });
-    }
+    const existing = await prisma.violation.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!existing) return res.status(404).json({ success: false, error: 'Violation not found' });
 
     const violation = await prisma.violation.update({
-      where: {
-        id: req.params.id,
-      },
-      data: {
-        status: 'RESOLVED',
-        resolvedAt: new Date(),
-      },
+      where: { id: req.params.id },
+      data: { status: 'RESOLVED', resolvedAt: new Date() },
     });
 
     await updateEntityFlagStatus(violation.entityId);
-
-    res.json({
-      success: true,
-      message: 'Violation resolved successfully',
-      data: violation,
-    });
-  } catch (err) {
-    next(err);
-  }
+    res.json({ success: true, message: 'Violation resolved successfully', data: violation });
+  } catch (err) { next(err); }
 });
 
 // ─── PATCH /api/v1/violations/:id/status ────────────────
-// hanya admin boleh ubah status
 router.patch('/:id/status', authenticate, isAdmin, async (req, res, next) => {
   try {
     const status = normalizeUpper(req.body.status);
+    if (!allowedStatuses.includes(status))
+      return res.status(400).json({ success: false, error: 'Invalid violation status', allowedStatuses });
 
-    if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid violation status',
-        allowedStatuses,
-      });
-    }
-
-    const existingViolation = await prisma.violation.findUnique({
-      where: {
-        id: req.params.id,
-      },
-    });
-
-    if (!existingViolation) {
-      return res.status(404).json({
-        success: false,
-        error: 'Violation not found',
-      });
-    }
+    const existing = await prisma.violation.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!existing) return res.status(404).json({ success: false, error: 'Violation not found' });
 
     const violation = await prisma.violation.update({
-      where: {
-        id: req.params.id,
-      },
-      data: {
-        status,
-        resolvedAt: status === 'RESOLVED' ? new Date() : null,
-      },
+      where: { id: req.params.id },
+      data: { status, resolvedAt: status === 'RESOLVED' ? new Date() : null },
     });
 
     await updateEntityFlagStatus(violation.entityId);
-
-    res.json({
-      success: true,
-      message: 'Violation status updated successfully',
-      data: violation,
-    });
-  } catch (err) {
-    next(err);
-  }
+    res.json({ success: true, message: 'Violation status updated successfully', data: violation });
+  } catch (err) { next(err); }
 });
 
 // ─── PATCH /api/v1/violations/:id/action ────────────────
-// hanya admin boleh menjalankan action
 router.patch('/:id/action', authenticate, isAdmin, async (req, res, next) => {
   try {
     const { action, status } = req.body;
-
     let nextStatus = status;
 
     if (!nextStatus && action) {
-      const normalizedAction = normalizeUpper(action);
-
-      if (normalizedAction === 'RESOLVE' || normalizedAction === 'RESOLVED') {
-        nextStatus = 'RESOLVED';
-      }
-
-      if (
-        normalizedAction === 'REVIEW' ||
-        normalizedAction === 'UNDER_REVIEW'
-      ) {
-        nextStatus = 'UNDER_REVIEW';
-      }
-
-      if (normalizedAction === 'REOPEN' || normalizedAction === 'ACTIVE') {
-        nextStatus = 'ACTIVE';
-      }
+      const a = normalizeUpper(action);
+      if (a === 'RESOLVE' || a === 'RESOLVED') nextStatus = 'RESOLVED';
+      if (a === 'REVIEW' || a === 'UNDER_REVIEW') nextStatus = 'UNDER_REVIEW';
+      if (a === 'REOPEN' || a === 'ACTIVE') nextStatus = 'ACTIVE';
     }
 
     nextStatus = normalizeUpper(nextStatus);
+    if (!allowedStatuses.includes(nextStatus))
+      return res.status(400).json({ success: false, error: 'Invalid action/status', allowedActions: ['RESOLVE', 'REVIEW', 'REOPEN'], allowedStatuses });
 
-    if (!allowedStatuses.includes(nextStatus)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid action/status',
-        allowedActions: ['RESOLVE', 'REVIEW', 'REOPEN'],
-        allowedStatuses,
-      });
-    }
-
-    const existingViolation = await prisma.violation.findUnique({
-      where: {
-        id: req.params.id,
-      },
-    });
-
-    if (!existingViolation) {
-      return res.status(404).json({
-        success: false,
-        error: 'Violation not found',
-      });
-    }
+    const existing = await prisma.violation.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!existing) return res.status(404).json({ success: false, error: 'Violation not found' });
 
     const violation = await prisma.violation.update({
-      where: {
-        id: req.params.id,
-      },
-      data: {
-        status: nextStatus,
-        resolvedAt: nextStatus === 'RESOLVED' ? new Date() : null,
-      },
+      where: { id: req.params.id },
+      data: { status: nextStatus, resolvedAt: nextStatus === 'RESOLVED' ? new Date() : null },
       include: {
-        entity: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            store: true,
-            address: true,
-            isFlagged: true,
-          },
-        },
-        district: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-          },
-        },
+        entity: { select: { id: true, name: true, type: true, store: true, address: true, isFlagged: true } },
+        district: { select: { id: true, name: true, code: true } },
         zoningRule: true,
       },
     });
 
     await updateEntityFlagStatus(violation.entityId);
+    res.json({ success: true, message: 'Violation action updated successfully', data: violation });
+  } catch (err) { next(err); }
+});
 
-    res.json({
-      success: true,
-      message: 'Violation action updated successfully',
-      data: violation,
+// ─── PATCH /api/v1/violations/:id/restore ───────────────
+// Restore dari recycle bin
+router.patch('/:id/restore', authenticate, isAdmin, async (req, res, next) => {
+  try {
+    const violation = await prisma.violation.findFirst({
+      where: { id: req.params.id, deletedAt: { not: null } },
     });
-  } catch (err) {
-    next(err);
-  }
+
+    if (!violation)
+      return res.status(404).json({ success: false, error: 'Violation not found in recycle bin' });
+
+    await prisma.violation.update({
+      where: { id: req.params.id },
+      data: { deletedAt: null },
+    });
+
+    await updateEntityFlagStatus(violation.entityId);
+    res.json({ success: true, message: 'Violation restored successfully' });
+  } catch (err) { next(err); }
+});
+
+// ─── PATCH /api/v1/violations/:id ───────────────────────
+router.patch('/:id', authenticate, isAdmin, async (req, res, next) => {
+  try {
+    const { status, severity } = req.body;
+    const data = {};
+    if (status) data.status = normalizeUpper(status);
+    if (severity) data.severity = normalizeUpper(severity);
+
+    const existing = await prisma.violation.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!existing) return res.status(404).json({ success: false, error: 'Violation not found' });
+
+    const updated = await prisma.violation.update({ where: { id: req.params.id }, data });
+    await updateEntityFlagStatus(updated.entityId);
+    res.json({ success: true, data: updated });
+  } catch (err) { next(err); }
 });
 
 // ─── POST /api/v1/violations ────────────────────────────
-// hanya admin boleh create
 router.post('/', authenticate, isAdmin, async (req, res, next) => {
   try {
-    const {
-      code,
-      description,
-      ruleType = 'PROXIMITY',
-      severity = 'WARNING',
-      status = 'ACTIVE',
-      distanceM,
-      entityId,
-      districtId,
-      zoningRuleId,
-    } = req.body;
+    const { code, description, ruleType = 'PROXIMITY', severity = 'WARNING', status = 'ACTIVE', distanceM, entityId, districtId, zoningRuleId } = req.body;
 
-    if (!code || !description || !entityId || !districtId) {
-      return res.status(400).json({
-        success: false,
-        error: 'code, description, entityId, dan districtId wajib diisi',
-      });
-    }
+    if (!code || !description || !entityId || !districtId)
+      return res.status(400).json({ success: false, error: 'code, description, entityId, dan districtId wajib diisi' });
 
     const upperRuleType = normalizeUpper(ruleType);
     const upperSeverity = normalizeUpper(severity);
     const upperStatus = normalizeUpper(status);
 
-    if (!allowedRuleTypes.includes(upperRuleType)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid rule type',
-        allowedRuleTypes,
-      });
-    }
+    if (!allowedRuleTypes.includes(upperRuleType)) return res.status(400).json({ success: false, error: 'Invalid rule type', allowedRuleTypes });
+    if (!allowedSeverities.includes(upperSeverity)) return res.status(400).json({ success: false, error: 'Invalid severity', allowedSeverities });
+    if (!allowedStatuses.includes(upperStatus)) return res.status(400).json({ success: false, error: 'Invalid violation status', allowedStatuses });
 
-    if (!allowedSeverities.includes(upperSeverity)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid severity',
-        allowedSeverities,
-      });
-    }
+    const entity = await prisma.entity.findUnique({ where: { id: entityId } });
+    if (!entity) return res.status(404).json({ success: false, error: 'Entity not found' });
 
-    if (!allowedStatuses.includes(upperStatus)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid violation status',
-        allowedStatuses,
-      });
-    }
-
-    const entity = await prisma.entity.findUnique({
-      where: {
-        id: entityId,
-      },
-    });
-
-    if (!entity) {
-      return res.status(404).json({
-        success: false,
-        error: 'Entity not found',
-      });
-    }
-
-    const district = await prisma.district.findUnique({
-      where: {
-        id: districtId,
-      },
-    });
-
-    if (!district) {
-      return res.status(404).json({
-        success: false,
-        error: 'District not found',
-      });
-    }
+    const district = await prisma.district.findUnique({ where: { id: districtId } });
+    if (!district) return res.status(404).json({ success: false, error: 'District not found' });
 
     if (zoningRuleId) {
-      const zoningRule = await prisma.zoningRule.findUnique({
-        where: {
-          id: zoningRuleId,
-        },
-      });
-
-      if (!zoningRule) {
-        return res.status(404).json({
-          success: false,
-          error: 'Zoning rule not found',
-        });
-      }
+      const zoningRule = await prisma.zoningRule.findUnique({ where: { id: zoningRuleId } });
+      if (!zoningRule) return res.status(404).json({ success: false, error: 'Zoning rule not found' });
     }
 
     const violation = await prisma.violation.create({
       data: {
-        code,
-        description,
+        code, description,
         ruleType: upperRuleType,
         severity: upperSeverity,
         status: upperStatus,
         distanceM: distanceM !== undefined ? Number(distanceM) : null,
-        entityId,
-        districtId,
+        entityId, districtId,
         zoningRuleId: zoningRuleId || null,
         resolvedAt: upperStatus === 'RESOLVED' ? new Date() : null,
+        deletedAt: null, // ← explicit null saat create
       },
       include: {
-        entity: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-          },
-        },
-        district: {
-          select: {
-            id: true,
-            name: true,
-            status: true,
-          },
-        },
+        entity: { select: { id: true, name: true, type: true } },
+        district: { select: { id: true, name: true, status: true } },
         zoningRule: true,
       },
     });
 
     await updateEntityFlagStatus(entityId);
-
-    res.status(201).json({
-      success: true,
-      message: 'Violation created successfully',
-      data: violation,
-    });
-  } catch (err) {
-    next(err);
-  }
+    res.status(201).json({ success: true, message: 'Violation created successfully', data: violation });
+  } catch (err) { next(err); }
 });
 
 // ─── PUT /api/v1/violations/:id ─────────────────────────
-// hanya admin boleh update full
 router.put('/:id', authenticate, isAdmin, async (req, res, next) => {
   try {
-    const {
-      code,
-      description,
-      ruleType,
-      severity,
-      status,
-      distanceM,
-      entityId,
-      districtId,
-      zoningRuleId,
-      resolvedAt,
-    } = req.body;
+    const { code, description, ruleType, severity, status, distanceM, entityId, districtId, zoningRuleId, resolvedAt } = req.body;
 
-    const existingViolation = await prisma.violation.findUnique({
-      where: {
-        id: req.params.id,
-      },
-    });
-
-    if (!existingViolation) {
-      return res.status(404).json({
-        success: false,
-        error: 'Violation not found',
-      });
-    }
+    const existingViolation = await prisma.violation.findFirst({ where: { id: req.params.id, deletedAt: null } });
+    if (!existingViolation) return res.status(404).json({ success: false, error: 'Violation not found' });
 
     if (entityId) {
-      const entity = await prisma.entity.findUnique({
-        where: {
-          id: entityId,
-        },
-      });
-
-      if (!entity) {
-        return res.status(404).json({
-          success: false,
-          error: 'Entity not found',
-        });
-      }
+      const entity = await prisma.entity.findUnique({ where: { id: entityId } });
+      if (!entity) return res.status(404).json({ success: false, error: 'Entity not found' });
     }
-
     if (districtId) {
-      const district = await prisma.district.findUnique({
-        where: {
-          id: districtId,
-        },
-      });
-
-      if (!district) {
-        return res.status(404).json({
-          success: false,
-          error: 'District not found',
-        });
-      }
+      const district = await prisma.district.findUnique({ where: { id: districtId } });
+      if (!district) return res.status(404).json({ success: false, error: 'District not found' });
     }
-
     if (zoningRuleId) {
-      const zoningRule = await prisma.zoningRule.findUnique({
-        where: {
-          id: zoningRuleId,
-        },
-      });
-
-      if (!zoningRule) {
-        return res.status(404).json({
-          success: false,
-          error: 'Zoning rule not found',
-        });
-      }
+      const zoningRule = await prisma.zoningRule.findUnique({ where: { id: zoningRuleId } });
+      if (!zoningRule) return res.status(404).json({ success: false, error: 'Zoning rule not found' });
     }
 
     const data = {};
-
     if (code !== undefined) data.code = code;
     if (description !== undefined) data.description = description;
-
     if (ruleType !== undefined) {
       const upperRuleType = normalizeUpper(ruleType);
-
-      if (!allowedRuleTypes.includes(upperRuleType)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid rule type',
-          allowedRuleTypes,
-        });
-      }
-
+      if (!allowedRuleTypes.includes(upperRuleType)) return res.status(400).json({ success: false, error: 'Invalid rule type', allowedRuleTypes });
       data.ruleType = upperRuleType;
     }
-
     if (severity !== undefined) {
       const upperSeverity = normalizeUpper(severity);
-
-      if (!allowedSeverities.includes(upperSeverity)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid severity',
-          allowedSeverities,
-        });
-      }
-
+      if (!allowedSeverities.includes(upperSeverity)) return res.status(400).json({ success: false, error: 'Invalid severity', allowedSeverities });
       data.severity = upperSeverity;
     }
-
     if (status !== undefined) {
       const upperStatus = normalizeUpper(status);
-
-      if (!allowedStatuses.includes(upperStatus)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid violation status',
-          allowedStatuses,
-        });
-      }
-
+      if (!allowedStatuses.includes(upperStatus)) return res.status(400).json({ success: false, error: 'Invalid violation status', allowedStatuses });
       data.status = upperStatus;
       data.resolvedAt = upperStatus === 'RESOLVED' ? new Date() : null;
     }
-
     if (distanceM !== undefined) data.distanceM = Number(distanceM);
     if (entityId !== undefined) data.entityId = entityId;
     if (districtId !== undefined) data.districtId = districtId;
     if (zoningRuleId !== undefined) data.zoningRuleId = zoningRuleId || null;
-
-    if (resolvedAt !== undefined) {
-      data.resolvedAt = resolvedAt ? new Date(resolvedAt) : null;
-    }
+    if (resolvedAt !== undefined) data.resolvedAt = resolvedAt ? new Date(resolvedAt) : null;
 
     const violation = await prisma.violation.update({
-      where: {
-        id: req.params.id,
-      },
-      data,
+      where: { id: req.params.id }, data,
       include: {
-        entity: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-          },
-        },
-        district: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        entity: { select: { id: true, name: true, type: true } },
+        district: { select: { id: true, name: true } },
         zoningRule: true,
       },
     });
 
     await updateEntityFlagStatus(violation.entityId);
+    if (existingViolation.entityId !== violation.entityId) await updateEntityFlagStatus(existingViolation.entityId);
 
-    if (existingViolation.entityId !== violation.entityId) {
-      await updateEntityFlagStatus(existingViolation.entityId);
-    }
-
-    res.json({
-      success: true,
-      message: 'Violation updated successfully',
-      data: violation,
-    });
-  } catch (err) {
-    next(err);
-  }
+    res.json({ success: true, message: 'Violation updated successfully', data: violation });
+  } catch (err) { next(err); }
 });
 
 // ─── DELETE /api/v1/violations/:id ──────────────────────
-// hanya admin boleh delete
+// Soft delete — set deletedAt, bukan hapus dari DB
 router.delete('/:id', authenticate, isAdmin, async (req, res, next) => {
   try {
-    const violation = await prisma.violation.findUnique({
-      where: {
-        id: req.params.id,
-      },
+    const violation = await prisma.violation.findFirst({
+      where: { id: req.params.id, deletedAt: null },
     });
 
-    if (!violation) {
-      return res.status(404).json({
-        success: false,
-        error: 'Violation not found',
-      });
-    }
+    if (!violation)
+      return res.status(404).json({ success: false, error: 'Violation not found or already deleted' });
 
-    await prisma.violation.delete({
-      where: {
-        id: req.params.id,
-      },
+    await prisma.violation.update({
+      where: { id: req.params.id },
+      data: { deletedAt: new Date() }, // ← soft delete
     });
 
     await updateEntityFlagStatus(violation.entityId);
-
-    res.json({
-      success: true,
-      message: 'Violation deleted successfully',
-    });
-  } catch (err) {
-    next(err);
-  }
+    res.json({ success: true, message: 'Violation deleted (soft delete)' });
+  } catch (err) { next(err); }
 });
 
 export default router;

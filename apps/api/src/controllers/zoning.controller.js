@@ -1,221 +1,118 @@
-// src/controllers/zoning.controller.js
-
 import prisma from '../config/database.js';
-import {
-  validateLatitudeLongitude,
-  haversineDistanceMeters,
-  formatDistance,
-  toNumber,
-} from '../utils/geo.util.js';
+import { validateLatitudeLongitude, haversineDistanceMeters, formatDistance, toNumber } from '../utils/geo.util.js';
 
-// ─── GET MAP POINTS ─────────────────────────────────────
+const DEFAULT_RADIUS = 500;
+
 // GET /api/v1/zoning/points
 export const getZoningMapPoints = async (req, res) => {
   try {
     const { type, districtId, store } = req.query;
+    const where = { latitude: { not: null }, longitude: { not: null } };
 
-    const where = {};
+    if (type) where.type = String(type).toUpperCase();
+    else where.type = { in: ['MINIMARKET', 'SUPERMARKET', 'PASAR'] };
 
-    // filter type optional: MINIMARKET / PASAR / SUPERMARKET
-    if (type) {
-      where.type = String(type).toUpperCase();
-    } else {
-      where.type = {
-        in: ['MINIMARKET', 'PASAR'],
-      };
-    }
-
-    if (districtId) {
-      where.districtId = districtId;
-    }
-
-    if (store) {
-      where.store = {
-        contains: store,
-        mode: 'insensitive',
-      };
-    }
+    if (districtId) where.districtId = districtId;
+    if (store) where.store = { contains: store, mode: 'insensitive' };
 
     const entities = await prisma.entity.findMany({
       where,
-      include: {
-        district: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            status: true,
-            saturationPercent: true,
-          },
-        },
-      },
-      orderBy: [
-        {
-          type: 'asc',
-        },
-        {
-          name: 'asc',
-        },
-      ],
+      include: { district: { select: { id: true, name: true, code: true, status: true, saturationPercent: true } } },
+      orderBy: [{ type: 'asc' }, { name: 'asc' }],
     });
 
-    const points = entities.map((entity) => {
-      const isPasar = entity.type === 'PASAR';
-      const isMinimarket = entity.type === 'MINIMARKET';
+    const points = entities.map((e) => {
+      const isPasar = e.type === 'PASAR';
+      const isSupermarket = e.type === 'SUPERMARKET';
 
       return {
-        id: entity.id,
-        name: entity.name,
-        type: entity.type,
-        store: entity.store,
-        address: entity.address,
-        kelurahan: entity.kelurahan,
-        latitude: entity.latitude,
-        longitude: entity.longitude,
-        rating: entity.rating,
-        totalRatings: entity.totalRatings,
-        permitStatus: entity.permitStatus,
-        complianceScore: entity.complianceScore,
-        isFlagged: entity.isFlagged,
-        district: entity.district,
-
-        // buat frontend map
-        markerType: isPasar ? 'PASAR' : 'MINIMARKET',
+        id: e.id,
+        name: e.name,
+        type: e.type,
+        store: e.store,
+        address: e.address,
+        kelurahan: e.kelurahan,
+        latitude: Number(e.latitude),
+        longitude: Number(e.longitude),
+        rating: e.rating,
+        totalRatings: e.totalRatings,
+        permitStatus: e.permitStatus,
+        complianceScore: e.complianceScore,
+        isFlagged: e.isFlagged,
+        district: e.district,
+        markerType: isPasar ? 'PASAR' : isSupermarket ? 'SUPERMARKET' : 'MINIMARKET',
         markerColor: isPasar
           ? 'green'
-          : entity.isFlagged
-            ? 'red'
-            : entity.store === 'Indomaret'
-              ? 'blue'
-              : entity.store === 'Alfamart'
-                ? 'orange'
-                : 'gray',
-        statusLabel: isPasar
-          ? 'Pasar Tradisional'
-          : entity.isFlagged
-            ? 'Berpotensi Melanggar'
-            : 'Aman',
-        popupTitle: entity.name,
-        popupSubtitle: isMinimarket
-          ? `${entity.store || 'Minimarket'} - ${entity.district?.name || '-'}`
-          : `Pasar Tradisional - ${entity.district?.name || '-'}`,
+          : e.isFlagged
+          ? 'red'
+          : e.store === 'Indomaret'
+          ? 'blue'
+          : e.store === 'Alfamart'
+          ? 'orange'
+          : isSupermarket
+          ? 'purple'
+          : 'gray',
+        statusLabel: isPasar ? 'Pasar Tradisional' : e.isFlagged ? 'Berpotensi Melanggar' : 'Aman',
+        popupTitle: e.name,
+        popupSubtitle: isPasar ? `Pasar Tradisional - ${e.district?.name || '-'}` : `${e.store || e.type} - ${e.district?.name || '-'}`,
       };
     });
 
     const summary = {
       total: points.length,
-      totalMinimarket: points.filter((item) => item.type === 'MINIMARKET').length,
-      totalPasar: points.filter((item) => item.type === 'PASAR').length,
-      totalFlagged: points.filter((item) => item.isFlagged).length,
+      totalMinimarket: points.filter((p) => p.type === 'MINIMARKET').length,
+      totalSupermarket: points.filter((p) => p.type === 'SUPERMARKET').length,
+      totalPasar: points.filter((p) => p.type === 'PASAR').length,
+      totalFlagged: points.filter((p) => p.isFlagged).length,
     };
 
-    return res.status(200).json({
-      success: true,
-      message: 'Data titik peta berhasil diambil',
-      data: {
-        summary,
-        points,
-      },
-    });
+    res.status(200).json({ success: true, message: 'Data titik peta berhasil diambil', data: { summary, points } });
   } catch (error) {
-    console.error('GET ZONING MAP POINTS ERROR:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Gagal mengambil data titik peta',
-      error: error.message,
-    });
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Gagal mengambil data titik peta', error: error.message });
   }
 };
 
-// ─── POST CALCULATE ZONING ──────────────────────────────
 // POST /api/v1/zoning/calculate
 export const calculateZoningStatus = async (req, res) => {
   try {
-    const {
-      latitude,
-      longitude,
-      radiusMeters,
-      name,
-    } = req.body;
-
+    const { latitude, longitude, radiusMeters, name } = req.body;
     const validation = validateLatitudeLongitude(latitude, longitude);
-
-    if (!validation.valid) {
-      return res.status(400).json({
-        success: false,
-        message: validation.message,
-      });
-    }
+    if (!validation.valid) return res.status(400).json({ success: false, message: validation.message });
 
     const lat = validation.latitude;
     const lon = validation.longitude;
-
-    // Ambil radius dari request body.
-    // Kalau kosong, coba ambil dari zoning rule.
-    // Kalau zoning rule kosong, default 500 meter.
     const bodyRadius = toNumber(radiusMeters);
 
     const zoningRule = await prisma.zoningRule.findFirst({
-      where: {
-        ruleType: 'PROXIMITY',
-        targetEntityType: 'MINIMARKET',
-        referenceEntityType: 'PASAR',
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+      where: { ruleType: 'PROXIMITY', targetEntityType: 'MINIMARKET', referenceEntityType: 'PASAR' },
+      orderBy: { createdAt: 'desc' },
     });
 
-    const minimumDistanceMeters =
-      bodyRadius ||
-      zoningRule?.minDistanceMeters ||
-      500;
+    const minimumDistanceMeters = bodyRadius || zoningRule?.minDistanceMeters || DEFAULT_RADIUS;
+    const ruleSource = bodyRadius ? 'REQUEST_BODY_RADIUS' : zoningRule ? 'DATABASE_ZONING_RULE' : 'DEFAULT_500_METERS';
 
     const pasars = await prisma.entity.findMany({
-      where: {
-        type: 'PASAR',
-      },
-      include: {
-        district: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-          },
-        },
-      },
+      where: { type: 'PASAR', latitude: { not: null }, longitude: { not: null } },
+      include: { district: { select: { id: true, name: true, code: true } } },
     });
 
-    if (pasars.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'Data pasar tradisional belum tersedia',
-      });
-    }
+    if (!pasars.length) return res.status(404).json({ success: false, message: 'Data pasar tradisional belum tersedia' });
 
     const distances = pasars
-      .map((pasar) => {
-        const distanceMeters = haversineDistanceMeters(
-          lat,
-          lon,
-          pasar.latitude,
-          pasar.longitude
-        );
-
-        const formattedDistance = formatDistance(distanceMeters);
-        const isViolation = distanceMeters < minimumDistanceMeters;
-
+      .map((p) => {
+        const dMeters = haversineDistanceMeters(lat, lon, Number(p.latitude), Number(p.longitude));
+        const f = formatDistance(dMeters);
         return {
-          pasarId: pasar.id,
-          pasarName: pasar.name,
-          address: pasar.address,
-          district: pasar.district,
-          latitude: pasar.latitude,
-          longitude: pasar.longitude,
-          distanceMeters: formattedDistance.meters,
-          distanceKm: formattedDistance.kilometers,
-          status: isViolation ? 'MELANGGAR' : 'AMAN',
+          pasarId: p.id,
+          pasarName: p.name,
+          address: p.address,
+          district: p.district,
+          latitude: Number(p.latitude),
+          longitude: Number(p.longitude),
+          distanceMeters: f.meters,
+          distanceKm: f.kilometers,
+          status: dMeters < minimumDistanceMeters ? 'MELANGGAR' : 'AMAN',
         };
       })
       .sort((a, b) => a.distanceMeters - b.distanceMeters);
@@ -223,28 +120,16 @@ export const calculateZoningStatus = async (req, res) => {
     const nearest = distances[0];
     const isViolation = nearest.distanceMeters < minimumDistanceMeters;
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       message: 'Perhitungan zonasi berhasil',
       data: {
-        input: {
-          name: name || 'Calon Minimarket',
-          latitude: lat,
-          longitude: lon,
-        },
-        rule: {
-          ruleType: 'PROXIMITY',
-          targetEntityType: 'MINIMARKET',
-          referenceEntityType: 'PASAR',
-          minimumDistanceMeters,
-          source: zoningRule ? 'DATABASE_ZONING_RULE' : 'DEFAULT_500_METERS',
-        },
+        input: { name: name || 'Calon Minimarket', latitude: lat, longitude: lon },
+        rule: { ruleType: 'PROXIMITY', targetEntityType: 'MINIMARKET', referenceEntityType: 'PASAR', minimumDistanceMeters, source: ruleSource },
         result: {
           status: isViolation ? 'DITOLAK' : 'AMAN',
           isViolation,
-          statusLabel: isViolation
-            ? '⛔ DITOLAK / MELANGGAR ATURAN ZONASI'
-            : '✅ AMAN / MEMENUHI ATURAN ZONASI',
+          statusLabel: isViolation ? '⛔ DITOLAK / MELANGGAR ATURAN ZONASI' : '✅ AMAN / MEMENUHI ATURAN ZONASI',
           message: isViolation
             ? `Lokasi berada ${nearest.distanceMeters} meter dari ${nearest.pasarName}, kurang dari batas minimal ${minimumDistanceMeters} meter.`
             : `Lokasi aman. Pasar terdekat adalah ${nearest.pasarName} dengan jarak ${nearest.distanceMeters} meter.`,
@@ -255,12 +140,7 @@ export const calculateZoningStatus = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('CALCULATE ZONING ERROR:', error);
-
-    return res.status(500).json({
-      success: false,
-      message: 'Gagal menghitung status zonasi',
-      error: error.message,
-    });
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Gagal menghitung status zonasi', error: error.message });
   }
 };

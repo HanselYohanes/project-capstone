@@ -43,6 +43,7 @@ export const AuthProvider = ({ children }) => {
 
             setUser(userData);
             localStorage.setItem("user", JSON.stringify(userData));
+            localStorage.setItem("token", userData.token); // ← tambah ini
 
             return { success: true };
         } catch (err) {
@@ -55,6 +56,7 @@ export const AuthProvider = ({ children }) => {
     const logout = () => {
         setUser(null);
         localStorage.removeItem("user");
+        localStorage.removeItem("token");
     };
 
     return (

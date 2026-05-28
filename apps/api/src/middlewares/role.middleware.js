@@ -2,7 +2,7 @@ import prisma from '../config/database.js';
 
 export const isAdmin = async (req, res, next) => {
   try {
-    if (!req.user) {
+    if (!req.user || !req.user.id) {
       return res.status(401).json({
         success: false,
         message: 'Unauthorized - User belum login',
@@ -29,7 +29,7 @@ export const isAdmin = async (req, res, next) => {
       });
     }
 
-    const adminAccess = user.isAdmin === true || user.roleId === 1;
+    const adminAccess = user.isAdmin === true || Number(user.roleId) === 1;
 
     if (!adminAccess) {
       return res.status(403).json({

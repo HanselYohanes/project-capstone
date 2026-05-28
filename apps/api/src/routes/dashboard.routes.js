@@ -12,6 +12,7 @@ const generateAuditCode = () => {
 
 const allowedViolationStatus = ['ACTIVE', 'UNDER_REVIEW', 'RESOLVED'];
 const allowedAuditPriority = ['HIGH', 'MEDIUM', 'LOW'];
+const allowedAuditStatus = ['PENDING', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
 // ─── GET /api/v1/dashboard/kpis ─────────────────────────
 router.get('/kpis', authenticate, async (req, res, next) => {
@@ -187,7 +188,8 @@ router.get('/top-districts', authenticate, async (req, res, next) => {
       },
     });
 
-    const data = districts.map((district) => ({
+    const data = districts.map((district, index) => ({
+      rank: index + 1,
       id: district.id,
       name: district.name,
       code: district.code,
@@ -195,6 +197,51 @@ router.get('/top-districts', authenticate, async (req, res, next) => {
       status: district.status,
       entityCount: district._count.entities,
       violationCount: district._count.violations,
+    }));
+
+    res.json({
+      success: true,
+      data,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── GET /api/v1/dashboard/ranking-analytics ────────────
+// Tambahan agar frontend tidak 404 saat klik Ranking Analytics
+router.get('/ranking-analytics', authenticate, async (req, res, next) => {
+  try {
+    const districts = await prisma.district.findMany({
+      orderBy: {
+        saturationPercent: 'desc',
+      },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        saturationPercent: true,
+        status: true,
+        _count: {
+          select: {
+            entities: true,
+            violations: true,
+            audits: true,
+          },
+        },
+      },
+    });
+
+    const data = districts.map((district, index) => ({
+      rank: index + 1,
+      id: district.id,
+      name: district.name,
+      code: district.code,
+      saturationPercent: district.saturationPercent,
+      status: district.status,
+      entityCount: district._count.entities,
+      violationCount: district._count.violations,
+      auditCount: district._count.audits,
     }));
 
     res.json({
@@ -251,8 +298,45 @@ router.get('/recent-violations', authenticate, async (req, res, next) => {
   }
 });
 
+// ─── GET /api/v1/dashboard/violations ───────────────────
+// Tambahan agar halaman Violation bisa ambil data dari dashboard juga
+router.get('/violations', authenticate, async (req, res, next) => {
+  try {
+    const violations = await prisma.violation.findMany({
+      orderBy: {
+        detectedAt: 'desc',
+      },
+      include: {
+        entity: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            address: true,
+            isFlagged: true,
+          },
+        },
+        district: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    res.json({
+      success: true,
+      data: violations,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── PATCH /api/v1/dashboard/recent-violations/:id/action ─
-// hanya admin boleh mengubah action/status recent violations
+// HANYA ADMIN: ubah action/status recent violations
 router.patch(
   '/recent-violations/:id/action',
   authenticate,
@@ -304,10 +388,6 @@ router.patch(
       const existingViolation = await prisma.violation.findUnique({
         where: {
           id,
-        },
-        include: {
-          entity: true,
-          district: true,
         },
       });
 
@@ -509,7 +589,7 @@ router.get('/audit-summary', authenticate, async (req, res, next) => {
 });
 
 // ─── POST /api/v1/dashboard/audits ──────────────────────
-// hanya admin boleh membuat new audit
+// HANYA ADMIN: membuat new audit
 router.post('/audits', authenticate, isAdmin, async (req, res, next) => {
   try {
     const {
@@ -528,12 +608,21 @@ router.post('/audits', authenticate, isAdmin, async (req, res, next) => {
     }
 
     const normalizedPriority = String(priority).toUpperCase();
+    const normalizedStatus = String(status).toUpperCase();
 
     if (!allowedAuditPriority.includes(normalizedPriority)) {
       return res.status(400).json({
         success: false,
         message: 'Priority audit tidak valid',
         allowedPriority: allowedAuditPriority,
+      });
+    }
+
+    if (!allowedAuditStatus.includes(normalizedStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status audit tidak valid',
+        allowedStatus: allowedAuditStatus,
       });
     }
 
@@ -578,11 +667,11 @@ router.post('/audits', authenticate, isAdmin, async (req, res, next) => {
       data: {
         code: generateAuditCode(),
         priority: normalizedPriority,
-        status: String(status).toUpperCase(),
+        status: normalizedStatus,
         findings: findings || null,
         entityId: entity.id,
         districtId: district.id,
-        completedAt: String(status).toUpperCase() === 'COMPLETED' ? new Date() : null,
+        completedAt: normalizedStatus === 'COMPLETED' ? new Date() : null,
       },
       include: {
         entity: {
@@ -614,7 +703,7 @@ router.post('/audits', authenticate, isAdmin, async (req, res, next) => {
 });
 
 // ─── PATCH /api/v1/dashboard/audits/:id/action ──────────
-// hanya admin boleh mengubah action/status audit
+// HANYA ADMIN: mengubah action/status audit
 router.patch('/audits/:id/action', authenticate, isAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -640,6 +729,18 @@ router.patch('/audits/:id/action', authenticate, isAdmin, async (req, res, next)
       return res.status(400).json({
         success: false,
         message: 'Status/action audit wajib diisi',
+        allowedAction: ['COMPLETE', 'CANCEL', 'PENDING', 'IN_PROGRESS'],
+        allowedStatus: allowedAuditStatus,
+      });
+    }
+
+    const normalizedStatus = String(nextStatus).toUpperCase();
+
+    if (!allowedAuditStatus.includes(normalizedStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status audit tidak valid',
+        allowedStatus: allowedAuditStatus,
       });
     }
 
@@ -655,8 +756,6 @@ router.patch('/audits/:id/action', authenticate, isAdmin, async (req, res, next)
         message: 'Audit tidak ditemukan',
       });
     }
-
-    const normalizedStatus = String(nextStatus).toUpperCase();
 
     const audit = await prisma.audit.update({
       where: {
@@ -753,289 +852,6 @@ router.get('/map-entities', authenticate, async (req, res, next) => {
     res.json({
       success: true,
       data: entities,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// HANYA ADMIN: ubah action recent violations dashboard
-router.patch(
-  '/recent-violations/:id/action',
-  authenticate,
-  isAdmin,
-  async (req, res, next) => {
-    try {
-      const { id } = req.params;
-      const { action, status } = req.body;
-
-      let nextStatus = status;
-
-      if (!nextStatus && action) {
-        const normalizedAction = String(action).toUpperCase();
-
-        if (normalizedAction === 'RESOLVE' || normalizedAction === 'RESOLVED') {
-          nextStatus = 'RESOLVED';
-        }
-
-        if (normalizedAction === 'REVIEW' || normalizedAction === 'UNDER_REVIEW') {
-          nextStatus = 'UNDER_REVIEW';
-        }
-
-        if (normalizedAction === 'REOPEN' || normalizedAction === 'ACTIVE') {
-          nextStatus = 'ACTIVE';
-        }
-      }
-
-      if (!nextStatus) {
-        return res.status(400).json({
-          success: false,
-          message: 'Action/status wajib diisi',
-        });
-      }
-
-      nextStatus = String(nextStatus).toUpperCase();
-
-      const allowedStatus = ['ACTIVE', 'UNDER_REVIEW', 'RESOLVED'];
-
-      if (!allowedStatus.includes(nextStatus)) {
-        return res.status(400).json({
-          success: false,
-          message: 'Status tidak valid',
-          allowedStatus,
-        });
-      }
-
-      const violation = await prisma.violation.findUnique({
-        where: {
-          id,
-        },
-      });
-
-      if (!violation) {
-        return res.status(404).json({
-          success: false,
-          message: 'Violation tidak ditemukan',
-        });
-      }
-
-      const updatedViolation = await prisma.violation.update({
-        where: {
-          id,
-        },
-        data: {
-          status: nextStatus,
-          resolvedAt: nextStatus === 'RESOLVED' ? new Date() : null,
-        },
-        include: {
-          entity: {
-            select: {
-              id: true,
-              name: true,
-              type: true,
-              address: true,
-              isFlagged: true,
-            },
-          },
-          district: {
-            select: {
-              id: true,
-              name: true,
-              status: true,
-            },
-          },
-        },
-      });
-
-      if (nextStatus === 'RESOLVED') {
-        const activeViolationCount = await prisma.violation.count({
-          where: {
-            entityId: violation.entityId,
-            status: {
-              in: ['ACTIVE', 'UNDER_REVIEW'],
-            },
-          },
-        });
-
-        if (activeViolationCount === 0) {
-          await prisma.entity.update({
-            where: {
-              id: violation.entityId,
-            },
-            data: {
-              isFlagged: false,
-            },
-          });
-        }
-      } else {
-        await prisma.entity.update({
-          where: {
-            id: violation.entityId,
-          },
-          data: {
-            isFlagged: true,
-          },
-        });
-      }
-
-      res.json({
-        success: true,
-        message: 'Action recent violation berhasil diubah',
-        data: updatedViolation,
-      });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-// HANYA ADMIN: new audit
-router.post('/audits', authenticate, isAdmin, async (req, res, next) => {
-  try {
-    const {
-      entityId,
-      districtId,
-      priority = 'MEDIUM',
-      status = 'PENDING',
-      findings,
-    } = req.body;
-
-    if (!entityId) {
-      return res.status(400).json({
-        success: false,
-        message: 'entityId wajib diisi',
-      });
-    }
-
-    const entity = await prisma.entity.findUnique({
-      where: {
-        id: entityId,
-      },
-      select: {
-        id: true,
-        name: true,
-        districtId: true,
-      },
-    });
-
-    if (!entity) {
-      return res.status(404).json({
-        success: false,
-        message: 'Entity tidak ditemukan',
-      });
-    }
-
-    const finalDistrictId = districtId || entity.districtId;
-
-    const district = await prisma.district.findUnique({
-      where: {
-        id: finalDistrictId,
-      },
-    });
-
-    if (!district) {
-      return res.status(404).json({
-        success: false,
-        message: 'District tidak ditemukan',
-      });
-    }
-
-    const audit = await prisma.audit.create({
-      data: {
-        code: `#AUD-${Date.now()}`,
-        priority: String(priority).toUpperCase(),
-        status: String(status).toUpperCase(),
-        findings: findings || null,
-        entityId: entity.id,
-        districtId: district.id,
-        completedAt:
-          String(status).toUpperCase() === 'COMPLETED' ? new Date() : null,
-      },
-      include: {
-        entity: true,
-        district: true,
-      },
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Audit baru berhasil dibuat',
-      data: audit,
-    });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// HANYA ADMIN: action audit
-router.patch('/audits/:id/action', authenticate, isAdmin, async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { action, status, findings } = req.body;
-
-    let nextStatus = status;
-
-    if (!nextStatus && action) {
-      const normalizedAction = String(action).toUpperCase();
-
-      if (normalizedAction === 'COMPLETE' || normalizedAction === 'COMPLETED') {
-        nextStatus = 'COMPLETED';
-      }
-
-      if (normalizedAction === 'CANCEL' || normalizedAction === 'CANCELLED') {
-        nextStatus = 'CANCELLED';
-      }
-
-      if (normalizedAction === 'PENDING') {
-        nextStatus = 'PENDING';
-      }
-
-      if (normalizedAction === 'IN_PROGRESS') {
-        nextStatus = 'IN_PROGRESS';
-      }
-    }
-
-    if (!nextStatus) {
-      return res.status(400).json({
-        success: false,
-        message: 'Action/status audit wajib diisi',
-      });
-    }
-
-    const existingAudit = await prisma.audit.findUnique({
-      where: {
-        id,
-      },
-    });
-
-    if (!existingAudit) {
-      return res.status(404).json({
-        success: false,
-        message: 'Audit tidak ditemukan',
-      });
-    }
-
-    const normalizedStatus = String(nextStatus).toUpperCase();
-
-    const audit = await prisma.audit.update({
-      where: {
-        id,
-      },
-      data: {
-        status: normalizedStatus,
-        findings: findings !== undefined ? findings : existingAudit.findings,
-        completedAt: normalizedStatus === 'COMPLETED' ? new Date() : null,
-      },
-      include: {
-        entity: true,
-        district: true,
-      },
-    });
-
-    res.json({
-      success: true,
-      message: 'Action audit berhasil diubah',
-      data: audit,
     });
   } catch (err) {
     next(err);
