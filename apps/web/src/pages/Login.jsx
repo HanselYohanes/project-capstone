@@ -36,7 +36,7 @@ const Login = () => {
 
             if (result.success) {
                 // replace: true agar tombol Back tidak kembali ke halaman login
-                navigate("/dashboard", { replace: true });
+                navigate("/", { replace: true });
             } else {
                 setError(result.error || "Email atau password salah.");
             }
@@ -57,7 +57,7 @@ const Login = () => {
             >
 
                 <h2 className="text-white text-lg font-bold mb-4 text-center">
-                    Login Admin
+                    Login
                 </h2>
 
                 {/* PESAN ERROR INLINE */}
