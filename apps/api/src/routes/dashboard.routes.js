@@ -588,6 +588,107 @@ router.get('/audit-summary', authenticate, async (req, res, next) => {
   }
 });
 
+// ─── GET /api/v1/dashboard/audits ───────────────────────
+// List semua audit dengan pagination, filter & search
+router.get('/audits', authenticate, async (req, res, next) => {
+  try {
+    const {
+      page = '1',
+      limit = '10',
+      status,
+      priority,
+      search,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = req.query;
+
+    const pageNum = Math.max(1, parseInt(page, 10));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+    const skip = (pageNum - 1) * limitNum;
+
+    // ── where clause ──────────────────────────────────────
+    const where = {};
+
+    if (status) {
+      const normalizedStatus = String(status).toUpperCase();
+      if (allowedAuditStatus.includes(normalizedStatus)) {
+        where.status = normalizedStatus;
+      }
+    }
+
+    if (priority) {
+      const normalizedPriority = String(priority).toUpperCase();
+      if (allowedAuditPriority.includes(normalizedPriority)) {
+        where.priority = normalizedPriority;
+      }
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim();
+      where.OR = [
+        { code: { contains: q, mode: 'insensitive' } },
+        { findings: { contains: q, mode: 'insensitive' } },
+        { entity: { name: { contains: q, mode: 'insensitive' } } },
+        { district: { name: { contains: q, mode: 'insensitive' } } },
+      ];
+    }
+
+    // ── allowed sort fields ────────────────────────────────
+    const allowedSortFields = ['createdAt', 'completedAt', 'priority', 'status', 'code'];
+    const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const safeSortOrder = sortOrder === 'asc' ? 'asc' : 'desc';
+
+    // ── query ──────────────────────────────────────────────
+    const [audits, total] = await Promise.all([
+      prisma.audit.findMany({
+        where,
+        skip,
+        take: limitNum,
+        orderBy: { [safeSortBy]: safeSortOrder },
+        include: {
+          entity: {
+            select: {
+              id: true,
+              name: true,
+              type: true,
+              address: true,
+              permitStatus: true,
+              complianceScore: true,
+              isFlagged: true,
+            },
+          },
+          district: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
+              saturationPercent: true,
+            },
+          },
+        },
+      }),
+      prisma.audit.count({ where }),
+    ]);
+
+    const totalPages = Math.ceil(total / limitNum);
+
+    res.json({
+      success: true,
+      data: audits,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages,
+        hasNext: pageNum < totalPages,
+        hasPrev: pageNum > 1,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── POST /api/v1/dashboard/audits ──────────────────────
 // HANYA ADMIN: membuat new audit
 router.post('/audits', authenticate, isAdmin, async (req, res, next) => {
