@@ -77,9 +77,9 @@ app.use((err, req, res, next) => {
 
 // ─── Start Server ───────────────────────────────────────
 app.listen(PORT, () => {
-  console.log(`\n🚀 Zonify API running at http://localhost:${PORT}`);
-  console.log(`📡 API Base: http://localhost:${PORT}/api/v1`);
-  console.log(`💚 Health:   http://localhost:${PORT}/api/v1/health`);
-  console.log(`🔐 Auth:     http://localhost:${PORT}/api/v1/auth`);
-  console.log(`🧪 Test:     http://localhost:${PORT}/api/v1/test\n`);
+  console.log(`\n Zonify API running at http://localhost:${PORT}`);
+  console.log(` API Base: http://localhost:${PORT}/api/v1`);
+  console.log(` Health:   http://localhost:${PORT}/api/v1/health`);
+  console.log(` Auth:     http://localhost:${PORT}/api/v1/auth`);
+  console.log(` Test:     http://localhost:${PORT}/api/v1/test\n`);
 });

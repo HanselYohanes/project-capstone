@@ -60,6 +60,8 @@ router.get('/', authenticate, async (req, res, next) => {
       where.OR = [
         { code: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
+        { entity: { name: { contains: search, mode: 'insensitive' } } },
+        { district: { name: { contains: search, mode: 'insensitive' } } }
       ];
     }
 
@@ -246,15 +248,20 @@ router.patch('/:id/action', authenticate, isAdmin, async (req, res, next) => {
 });
 
 // ─── PATCH /api/v1/violations/:id/restore ───────────────
-// Restore dari recycle bin
-router.patch('/:id/restore', authenticate, isAdmin, async (req, res, next) => {
+// ─── RESTORE /api/v1/violations/:id/restore ───────────────
+// Restore dari recycle bin (Support PATCH, PUT, dan POST sekaligus)
+const restoreHandler = async (req, res, next) => {
   try {
     const violation = await prisma.violation.findFirst({
-      where: { id: req.params.id, deletedAt: { not: null } },
+      where: {
+        id: req.params.id,
+        NOT: { deletedAt: null } // Kueri Prisma paling aman
+      },
     });
 
-    if (!violation)
-      return res.status(404).json({ success: false, error: 'Violation not found in recycle bin' });
+    if (!violation) {
+      return res.status(404).json({ success: false, error: 'Data tidak ditemukan di tong sampah (recycle bin)' });
+    }
 
     await prisma.violation.update({
       where: { id: req.params.id },
@@ -263,9 +270,15 @@ router.patch('/:id/restore', authenticate, isAdmin, async (req, res, next) => {
 
     await updateEntityFlagStatus(violation.entityId);
     res.json({ success: true, message: 'Violation restored successfully' });
-  } catch (err) { next(err); }
-});
+  } catch (err) {
+    next(err);
+  }
+};
 
+// Daftarkan ke semua metode HTTP yang mungkin dipakai Frontend
+router.patch('/:id/restore', authenticate, isAdmin, restoreHandler);
+router.put('/:id/restore', authenticate, isAdmin, restoreHandler);
+router.post('/:id/restore', authenticate, isAdmin, restoreHandler);
 // ─── PATCH /api/v1/violations/:id ───────────────────────
 router.patch('/:id', authenticate, isAdmin, async (req, res, next) => {
   try {
