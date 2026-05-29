@@ -166,6 +166,11 @@ const Sidebar = () => {
             <span className="font-medium text-sm">Violations</span>
           </NavLink>
 
+          <NavLink to="/audit-logs" className={({ isActive }) => isActive ? activeLinkClass : inactiveLinkClass}>
+            <span className="material-symbols-outlined">assignment</span>
+            <span className="font-medium text-sm">Audit Logs</span>
+          </NavLink>
+
           <NavLink to="/calculator" className={({ isActive }) => isActive ? activeLinkClass : inactiveLinkClass}>
             <span className="material-symbols-outlined">calculate</span>
             <span className="font-medium text-sm">Distance calculator</span>

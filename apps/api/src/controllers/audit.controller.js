@@ -305,4 +305,97 @@ export const createAudit = async (req, res, next) => {
 export const auditMiddlewares = {
   list: [authenticate],
   create: [authenticate, isAdmin],
+  delete: [authenticate, isAdmin],
+  restore: [authenticate, isAdmin],
+};
+
+// ─── DELETE /api/v1/audits/:id ────────────────────────────────────────────────
+// HANYA ADMIN: Soft-delete — ubah status menjadi 'CANCELLED' (tidak hapus fisik)
+// Relasi ke Entity dan District tetap utuh; data bisa di-restore kapanpun.
+export const deleteAudit = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.audit.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Audit tidak ditemukan',
+      });
+    }
+
+    if (existing.status === 'CANCELLED') {
+      return res.status(409).json({
+        success: false,
+        message: 'Audit sudah dalam status CANCELLED',
+      });
+    }
+
+    const updated = await prisma.audit.update({
+      where: { id },
+      data: { status: 'CANCELLED' },
+      select: {
+        id: true, code: true, status: true, priority: true,
+        entity: { select: { id: true, name: true, type: true } },
+        district: { select: { id: true, name: true } },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Audit berhasil dihapus (soft-delete: status → CANCELLED)',
+      data: updated,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// ─── POST /api/v1/audits/:id/restore ─────────────────────────────────────────
+// HANYA ADMIN: Kembalikan audit berstatus CANCELLED ke PENDING
+export const restoreAudit = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.audit.findUnique({
+      where: { id },
+      select: { id: true, status: true },
+    });
+
+    if (!existing) {
+      return res.status(404).json({
+        success: false,
+        message: 'Audit tidak ditemukan',
+      });
+    }
+
+    if (existing.status !== 'CANCELLED') {
+      return res.status(409).json({
+        success: false,
+        message: `Hanya audit berstatus CANCELLED yang bisa di-restore (saat ini: '${existing.status}')`,
+      });
+    }
+
+    const updated = await prisma.audit.update({
+      where: { id },
+      data: { status: 'PENDING' },
+      select: {
+        id: true, code: true, status: true, priority: true,
+        entity: { select: { id: true, name: true, type: true } },
+        district: { select: { id: true, name: true } },
+      },
+    });
+
+    res.json({
+      success: true,
+      message: 'Audit berhasil di-restore (status → PENDING)',
+      data: updated,
+    });
+  } catch (err) {
+    next(err);
+  }
 };

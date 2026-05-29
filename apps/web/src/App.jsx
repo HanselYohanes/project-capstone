@@ -7,6 +7,7 @@ import Analytics from './pages/Analytics';
 import Rankings from './pages/Rankings';
 import ViolationsPage from "./pages/ViolationsPage";
 import Calculator from "./pages/calculator/Calculator";
+import AuditLogs from "./pages/AuditLogs";
 
 // 🔥 TAMBAHAN
 import Login from "./pages/Login";
@@ -56,6 +57,16 @@ function App() {
 
         {/* 🧮 KALKULATOR JARAK (Haversine) */}
         <Route path="/calculator" element={<Calculator />} />
+
+        {/* 📋 AUDIT LOGS — Admin only */}
+        <Route
+          path="/audit-logs"
+          element={
+            <ProtectedRoute>
+              <AuditLogs />
+            </ProtectedRoute>
+          }
+        />
       </Route>
 
       {/* ─────────────────────────────────────────────────────────────

@@ -17,7 +17,13 @@ router.get('/', async (req, res, next) => {
       search,
     } = req.query;
 
-    const where = {};
+    const where = {
+      audits: {
+        none: {
+          status: 'CANCELLED',
+        },
+      },
+    };
 
     const allowedTypes = ['PASAR', 'MINIMARKET', 'SUPERMARKET'];
     const allowedPermitStatuses = ['APPROVED', 'UNDER_REVIEW', 'REJECTED', 'EXPIRED'];

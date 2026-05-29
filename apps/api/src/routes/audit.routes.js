@@ -1,5 +1,11 @@
 import { Router } from 'express';
-import { listAudits, createAudit, auditMiddlewares } from '../controllers/audit.controller.js';
+import {
+  listAudits,
+  createAudit,
+  deleteAudit,
+  restoreAudit,
+  auditMiddlewares,
+} from '../controllers/audit.controller.js';
 
 const router = Router();
 
@@ -9,13 +15,15 @@ router.get('/', ...auditMiddlewares.list, listAudits);
 
 // ─── POST /api/v1/audits ──────────────────────────────────────────────────────
 // HANYA ADMIN: buat audit baru secara atomik (Audit + Entity dalam 1 transaksi)
-//
-// Body (buat entity BARU sekaligus):
-//   { name, type, address, latitude, longitude, districtId,
-//     store, kelurahan, permitStatus, priority, status, findings }
-//
-// Body (tautkan ke entity YANG SUDAH ADA):
-//   { entityId, districtId, priority, status, findings }
 router.post('/', ...auditMiddlewares.create, createAudit);
+
+// ─── DELETE /api/v1/audits/:id ────────────────────────────────────────────────
+// HANYA ADMIN: soft-delete (status → CANCELLED) — data tidak dihapus permanen
+router.delete('/:id', ...auditMiddlewares.delete, deleteAudit);
+
+// ─── POST /api/v1/audits/:id/restore ─────────────────────────────────────────
+// HANYA ADMIN: restore audit berstatus CANCELLED kembali ke PENDING
+// ⚠ Rute ini HARUS didefinisikan SEBELUM /:id agar Express tidak salah match
+router.post('/:id/restore', ...auditMiddlewares.restore, restoreAudit);
 
 export default router;
