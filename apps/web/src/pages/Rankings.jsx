@@ -157,9 +157,10 @@ const Rankings = () => {
 
           {/* Table Container */}
           <div className="glass-panel rounded-xl overflow-hidden w-full">
+            <div className="overflow-y-auto max-h-[70vh]">
             <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-surface-container-low/50 border-b border-outline-variant/20">
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-surface-container-low/80 backdrop-blur border-b border-outline-variant/20">
                   <th className="py-4 px-6 text-xs text-on-surface-variant uppercase">Pos</th>
                   <th className="py-4 px-6 text-xs text-on-surface-variant uppercase">District</th>
                   <th className="py-4 px-6 text-xs text-on-surface-variant uppercase text-right">Violations</th>
@@ -206,6 +207,7 @@ const Rankings = () => {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
 
         </section>

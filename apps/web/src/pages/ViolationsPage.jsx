@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import Header from '../components/Header';
 import jsPDF from 'jspdf';
@@ -448,6 +448,44 @@ const ViolationsPage = () => {
                             {summaryLoading ? <div className="h-7 w-14 rounded-md bg-green-400/10 animate-pulse" /> : <p className="text-2xl font-bold text-green-400">{summary.safe.toLocaleString()}</p>}
                         </div>
                     </div>
+                </div>
+
+                {/* -- Status Legend Help Icon -- */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-on-surface-variant font-medium uppercase tracking-wider">Status Legend</span>
+                  <div className="relative group">
+                    <div className="flex items-center gap-1.5 cursor-help px-2.5 py-1 rounded-full bg-surface-container border border-outline-variant/20 hover:border-primary/30 transition-colors">
+                      <span className="material-symbols-outlined text-[14px] text-on-surface-variant">info</span>
+                      <span className="text-xs text-on-surface-variant">Kriteria Status</span>
+                    </div>
+                    {/* Tooltip */}
+                    <div className="absolute left-0 top-8 z-30 w-80 rounded-xl bg-surface-container-highest border border-outline-variant/30 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none p-4">
+                      <p className="text-xs font-bold text-white uppercase tracking-wider mb-3">Kriteria Penentuan Status</p>
+                      <div className="flex flex-col gap-2.5">
+                        <div className="flex items-start gap-2.5">
+                          <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-green-400 flex-shrink-0" />
+                          <div>
+                            <span className="text-xs font-semibold text-green-400">SAFE</span>
+                            <p className="text-xs text-on-surface-variant mt-0.5">Zonasi aman sesuai regulasi. Minimarket berada di luar radius 500m dari pasar tradisional dan tidak terdeteksi pelanggaran aktif.</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                          <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-tertiary flex-shrink-0" />
+                          <div>
+                            <span className="text-xs font-semibold text-tertiary">WARNING</span>
+                            <p className="text-xs text-on-surface-variant mt-0.5">Mendekati batas limit jarak atau area saturasi tinggi. Perlu pantauan rutin — berisiko melanggar jika ada ekspansi lebih lanjut.</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2.5">
+                          <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-error flex-shrink-0" />
+                          <div>
+                            <span className="text-xs font-semibold text-error">CRITICAL</span>
+                            <p className="text-xs text-on-surface-variant mt-0.5">Terbukti melanggar batas jarak minimum 500m dari pasar tradisional. Wajib tindak lanjut administratif segera.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* -- Filters -- */}

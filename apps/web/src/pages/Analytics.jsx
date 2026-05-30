@@ -250,9 +250,7 @@ function RankingMatrix({ rows, loading }) {
             <td className="py-4 px-4"><Skeleton className="w-6 h-4" /></td>
             <td className="py-4 px-4"><Skeleton className="w-32 h-4" /></td>
             <td className="py-4 px-4 text-right"><Skeleton className="w-10 h-4 ml-auto" /></td>
-            <td className="py-4 px-4 text-right"><Skeleton className="w-10 h-4 ml-auto" /></td>
             <td className="py-4 px-4 text-center"><Skeleton className="w-16 h-5 mx-auto" /></td>
-            <td className="py-4 px-4 text-center"><Skeleton className="w-5 h-5 mx-auto" /></td>
           </tr>
         ))}
       </tbody>
@@ -284,7 +282,7 @@ function RankingMatrix({ rows, loading }) {
   return (
     <tbody className="divide-y divide-outline-variant/10">
       {districtRows.map((d, i) => (
-        <tr key={d.name} className="hover:bg-white/5 transition-colors group">
+        <tr key={d.name} className="hover:bg-white/5 transition-colors">
           <td className="py-4 px-4 font-number text-on-surface-variant">
             {String(i + 1).padStart(2, '0')}
           </td>
@@ -295,11 +293,6 @@ function RankingMatrix({ rows, loading }) {
               {d.status.charAt(0) + d.status.slice(1).toLowerCase()}
             </span>
           </td>
-          <td className="py-4 px-4 text-center">
-            <button className="text-on-surface-variant group-hover:text-primary transition-colors">
-              <span className="material-symbols-outlined text-[20px]">chevron_right</span>
-            </button>
-          </td>
         </tr>
       ))}
     </tbody>
@@ -307,9 +300,36 @@ function RankingMatrix({ rows, loading }) {
 }
 
 // ─── Main Component ───────────────────────────────────────
+const TIMEFRAME_OPTIONS = ['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'This Year'];
+
 const Analytics = () => {
   const { data, loading } = useAnalyticsData();
   const { kpis, saturation, trends, rankingMatrix, comparison } = data;
+  const [timeframeIdx, setTimeframeIdx] = useState(1); // Default: Last 30 Days
+
+  const handleExport = () => {
+    // Build a district summary from rankingMatrix rows for CSV export
+    const districtMap = {};
+    for (const v of rankingMatrix) {
+      const name = v.districtName;
+      if (!name) continue;
+      if (!districtMap[name]) districtMap[name] = { name, violations: 0, status: v.severity };
+      districtMap[name].violations++;
+    }
+    const rows = Object.values(districtMap).sort((a, b) => b.violations - a.violations);
+    const header = 'Rank,District,Violation Count,Status';
+    const csvRows = rows.map((d, i) => `${i + 1},${d.name},${d.violations},${d.status}`);
+    const csv = [header, ...csvRows].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'Zonify_District_Ranking.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const kpiCards = [
     {
@@ -369,10 +389,20 @@ const Analytics = () => {
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-on-surface-variant font-medium">Timeframe:</span>
-            <button className="glass-panel px-4 py-2 rounded-lg text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
-              Last 30 Days
-              <span className="material-symbols-outlined text-[16px]">expand_more</span>
-            </button>
+            <div className="flex items-center gap-1 glass-panel rounded-lg p-1">
+              {TIMEFRAME_OPTIONS.map((opt, i) => (
+                <button
+                  key={opt}
+                  onClick={() => setTimeframeIdx(i)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${i === timeframeIdx
+                      ? 'bg-primary/20 text-primary border border-primary/30'
+                      : 'text-on-surface-variant hover:text-white hover:bg-white/5'
+                    }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -416,33 +446,102 @@ const Analytics = () => {
           <div className="lg:col-span-2 flex flex-col gap-8">
 
             {/* Bar Chart: Saturation by District */}
-            <div className="glass-panel p-6 rounded-xl h-[340px] flex flex-col relative">
+            <div className="glass-panel p-6 rounded-xl flex flex-col relative">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-headline text-lg font-bold">Over-Saturation Score by District</h3>
-                <button className="text-on-surface-variant hover:text-white transition-colors">
-                  <span className="material-symbols-outlined text-[20px]">more_horiz</span>
-                </button>
+                {/* Help Icon with tooltip */}
+                <div className="relative group">
+                  <span className="material-symbols-outlined text-[18px] text-on-surface-variant cursor-help hover:text-white transition-colors">
+                    info
+                  </span>
+                  <div className="absolute right-0 top-6 z-20 w-64 px-3 py-2.5 rounded-lg bg-surface-container-highest border border-outline-variant/30 text-xs text-on-surface-variant shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <p className="font-semibold text-white mb-1">Saturasi per Kecamatan</p>
+                    Menampilkan persentase saturasi minimarket per kecamatan berdasarkan rasio jumlah minimarket terhadap kapasitas zona. Semakin tinggi bar, semakin jenuh area tersebut.
+                  </div>
+                </div>
               </div>
-              <SaturationChart districts={saturation} loading={loading} />
+              <div className="h-[220px] flex flex-col">
+                <SaturationChart districts={saturation} loading={loading} />
+              </div>
+              {/* Data Interpretation */}
+              <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-outline-variant/20 leading-relaxed">
+                {loading
+                  ? 'Memuat interpretasi data...'
+                  : saturation.length === 0
+                    ? 'Belum ada data saturasi untuk ditampilkan.'
+                    : (() => {
+                      const critical = saturation.filter(d => d.status === 'CRITICAL').length;
+                      const top = [...saturation].sort((a, b) => b.saturationPercent - a.saturationPercent)[0];
+                      return critical > 0
+                        ? `⚠ ${critical} kecamatan dalam status CRITICAL. Kecamatan paling jenuh: ${top?.name} (${top?.saturationPercent?.toFixed(1)}%). Pertimbangkan moratorium izin minimarket baru di zona ini.`
+                        : `Semua kecamatan dalam batas aman. Kecamatan dengan saturasi tertinggi: ${top?.name} (${top?.saturationPercent?.toFixed(1)}%). Pantau secara berkala.`;
+                    })()
+                }
+              </p>
             </div>
 
             {/* Line Chart: Violation Trend */}
-            <div className="glass-panel p-6 rounded-xl h-[280px] flex flex-col relative overflow-hidden">
+            <div className="glass-panel p-6 rounded-xl flex flex-col relative overflow-hidden">
               <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ background: 'radial-gradient(circle at 70% 30%, rgba(124,58,237,0.3) 0%, transparent 60%)' }} />
               <div className="flex justify-between items-center mb-6 z-10">
                 <h3 className="font-headline text-lg font-bold">Violation Trend Line</h3>
-                <div className="flex items-center gap-4 text-xs font-medium">
-                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-primary" /> Commercial</div>
-                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-tertiary" /> Residential</div>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 text-xs font-medium">
+                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-primary" /> Commercial</div>
+                    <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-tertiary" /> Residential</div>
+                  </div>
+                  {/* Help Icon with tooltip */}
+                  <div className="relative group">
+                    <span className="material-symbols-outlined text-[18px] text-on-surface-variant cursor-help hover:text-white transition-colors">
+                      info
+                    </span>
+                    <div className="absolute right-0 top-6 z-20 w-64 px-3 py-2.5 rounded-lg bg-surface-container-highest border border-outline-variant/30 text-xs text-on-surface-variant shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                      <p className="font-semibold text-white mb-1">Tren Pelanggaran Mingguan</p>
+                      Menampilkan jumlah pelanggaran zona komersial (ungu) dan residensial (oranye) per minggu. Tren naik mengindikasikan peningkatan risiko pelanggaran di periode tersebut.
+                    </div>
+                  </div>
                 </div>
               </div>
-              <TrendChart trends={trends} loading={loading} />
+              <div className="h-[180px] flex flex-col">
+                <TrendChart trends={trends} loading={loading} />
+              </div>
+              {/* Data Interpretation */}
+              <p className="text-xs text-slate-400 mt-3 pt-3 border-t border-outline-variant/20 leading-relaxed">
+                {loading
+                  ? 'Memuat interpretasi data...'
+                  : trends.length === 0
+                    ? 'Belum ada data tren pelanggaran.'
+                    : (() => {
+                      const recent = trends.slice(-1)[0];
+                      const prev = trends.slice(-2, -1)[0];
+                      if (!recent) return 'Data tren tidak tersedia.';
+                      const diff = prev ? recent.commercial - prev.commercial : 0;
+                      return diff > 0
+                        ? `📈 Pelanggaran komersial minggu ini naik ${diff} kasus dibanding minggu lalu. Waspadai lonjakan di zona padat.`
+                        : diff < 0
+                          ? `📉 Pelanggaran komersial turun ${Math.abs(diff)} kasus minggu ini. Tren membaik, pantau konsistensinya.`
+                          : `➡ Pelanggaran komersial stabil minggu ini (${recent.commercial} kasus). Pertahankan pengawasan rutin.`;
+                    })()
+                }
+              </p>
             </div>
           </div>
 
           {/* Radar: District Comparison */}
           <div className="glass-panel p-6 rounded-xl flex flex-col relative">
-            <h3 className="font-headline text-lg font-bold mb-8">District Comparison</h3>
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="font-headline text-lg font-bold">District Comparison</h3>
+              {/* Help Icon with tooltip */}
+              <div className="relative group">
+                <span className="material-symbols-outlined text-[18px] text-on-surface-variant cursor-help hover:text-white transition-colors">
+                  info
+                </span>
+                <div className="absolute right-0 top-6 z-20 w-64 px-3 py-2.5 rounded-lg bg-surface-container-highest border border-outline-variant/30 text-xs text-on-surface-variant shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                  <p className="font-semibold text-white mb-1">Radar Komparasi Kecamatan</p>
+                  Membandingkan 5 dimensi zona antar kecamatan: Density (kepadatan), Permits (izin aktif), Compliance (kepatuhan), Violations (pelanggaran), dan Zoning Area (luas zona). Semakin luas polygon, semakin tinggi indeks gabungannya.
+                </div>
+              </div>
+            </div>
             <div className="flex-1 flex justify-center items-center relative">
               <div className="relative w-64 h-64">
                 <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 100 100">
@@ -531,6 +630,18 @@ const Analytics = () => {
                 ))
               }
             </div>
+            {/* Data Interpretation */}
+            <p className="text-xs text-slate-400 mt-4 pt-3 border-t border-outline-variant/20 leading-relaxed">
+              {loading || comparison.length === 0
+                ? 'Memuat data perbandingan kecamatan...'
+                : (() => {
+                  const top = comparison[0];
+                  if (!top?.axes) return 'Data komparasi tidak tersedia.';
+                  const idx = ((top.axes.density + top.axes.permits + top.axes.compliance + top.axes.violations + top.axes.zoningArea) / 5).toFixed(1);
+                  return `Kecamatan ${top.name} memiliki indeks tertinggi (${idx}/100). Perlu perhatian khusus pada dimensi dengan nilai terendah.`;
+                })()
+              }
+            </p>
           </div>
         </div>
 
@@ -538,7 +649,10 @@ const Analytics = () => {
         <div className="glass-panel p-6 rounded-xl flex flex-col">
           <div className="flex justify-between items-center mb-6">
             <h3 className="font-headline text-lg font-bold">District Ranking Matrix</h3>
-            <button className="flex items-center gap-2 text-sm text-primary hover:text-primary-fixed transition-colors">
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-2 text-sm text-primary hover:text-primary-fixed transition-colors"
+            >
               <span className="material-symbols-outlined text-[18px]">download</span>
               Export Report
             </button>
@@ -551,7 +665,6 @@ const Analytics = () => {
                   <th className="pb-3 px-4 font-medium">District</th>
                   <th className="pb-3 px-4 font-medium text-right">Violation Count</th>
                   <th className="pb-3 px-4 font-medium text-center">Status Flag</th>
-                  <th className="pb-3 px-4 font-medium text-center">Actions</th>
                 </tr>
               </thead>
               <RankingMatrix rows={rankingMatrix} loading={loading} />
