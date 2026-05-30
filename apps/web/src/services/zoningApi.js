@@ -30,6 +30,42 @@ export const calculateZoning = async (payload) => {
   return json;
 };
 
+/**
+ * Memanggil endpoint AI feature-engineering.
+ * POST /api/v1/ai/predict
+ * Menghitung fitur kompetitor (Haversine) di backend lalu
+ * meneruskannya ke Python ML service.
+ * Mengembalikan { prediction, ai_recommendation } yang sudah dinormalisasi.
+ */
+export const predictAI = async ({ latitude, longitude }) => {
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_BASE_URL}/ai/predict`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ latitude, longitude }),
+  });
+
+  const json = await response.json();
+  if (!response.ok) throw new Error(json.message || 'Gagal melakukan prediksi AI');
+
+  // json.data.prediction = objek dari Python ML service
+  // { is_violation, verdict, confidence_percentage, ai_recommendation? }
+  const predictionObj = json?.data?.prediction ?? json?.prediction ?? {};
+  const aiRec =
+    predictionObj.ai_recommendation ??
+    json?.data?.ai_recommendation ??
+    json?.ai_recommendation ??
+    null;
+
+  return {
+    prediction: predictionObj,
+    ai_recommendation: aiRec,
+  };
+};
+
 // // src/services/zoningApi.js
 
 // const API_BASE_URL =

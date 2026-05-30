@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import Header from '../../components/Header';
-import { calculateZoning } from '../../services/zoningApi';
+import { calculateZoning, predictAI } from '../../services/zoningApi';
+import { MapContainer, TileLayer, CircleMarker, Circle, Popup } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 
 const THRESHOLD_METER = 500;
 
@@ -43,16 +45,33 @@ const Calculator = () => {
       setError('');
       setResults(null);
 
-      // Memanggil fungsi API yang sudah kita hubungkan ke backend
-      const response = await calculateZoning({
-        name: form.nama || 'Calon Minimarket',
-        latitude: lat,
-        longitude: lng,
-        radiusMeters: THRESHOLD_METER,
-      });
+      // Jalankan kedua request secara paralel agar lebih cepat.
+      // Promise.allSettled memastikan jika salah satu gagal, yang lain tetap diproses.
+      const [zoningResult, aiResult] = await Promise.allSettled([
+        calculateZoning({
+          name: form.nama || 'Calon Minimarket',
+          latitude: lat,
+          longitude: lng,
+          radiusMeters: THRESHOLD_METER,
+        }),
+        predictAI({ latitude: lat, longitude: lng }),
+      ]);
 
-      // Menyesuaikan dengan struktur respon API (ada pembungkus 'data')
-      setResults(response.data);
+      // Zoning harus berhasil — jika gagal, lempar error seperti sebelumnya
+      if (zoningResult.status === 'rejected') {
+        throw new Error(zoningResult.reason?.message || 'Gagal menghitung zonasi.');
+      }
+
+      const zoningData = zoningResult.value?.data ?? {};
+
+      // Gabungkan data AI ke dalam state hasil zonasi
+      const aiData = aiResult.status === 'fulfilled' ? aiResult.value : {};
+
+      setResults({
+        ...zoningData,
+        prediction: aiData.prediction ?? null,
+        ai_recommendation: aiData.ai_recommendation ?? null,
+      });
     } catch (err) {
       setError(err.message || 'Gagal menghitung zonasi.');
     } finally {
@@ -245,6 +264,43 @@ const Calculator = () => {
                   <span className="text-base font-bold text-red-400">{prediction.confidence_percentage}</span>
                 </div>
 
+                {/* Mini Map */}
+                {results?.input?.latitude && results?.input?.longitude && (
+                  <div className="rounded-xl overflow-hidden border border-red-500/20" style={{ height: '220px' }}>
+                    <MapContainer
+                      key={`map-violation-${results.input.latitude}-${results.input.longitude}`}
+                      center={[results.input.latitude, results.input.longitude]}
+                      zoom={15}
+                      style={{ height: '100%', width: '100%' }}
+                      zoomControl={false}
+                      scrollWheelZoom={false}
+                      attributionControl={false}
+                    >
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      {/* Radius zona 500m */}
+                      <Circle
+                        center={[results.input.latitude, results.input.longitude]}
+                        radius={THRESHOLD_METER}
+                        pathOptions={{ color: '#EF4444', fillColor: '#EF4444', fillOpacity: 0.08, weight: 1.5, dashArray: '5, 5' }}
+                      />
+                      {/* Marker titik calon minimarket */}
+                      <CircleMarker
+                        center={[results.input.latitude, results.input.longitude]}
+                        radius={9}
+                        pathOptions={{ color: '#EF4444', fillColor: '#EF4444', fillOpacity: 1, weight: 2 }}
+                      >
+                        <Popup>
+                          <div className="text-sm">
+                            <strong>{results.input?.name || 'Calon Minimarket'}</strong><br />
+                            {results.input.latitude.toFixed(6)}, {results.input.longitude.toFixed(6)}<br />
+                            <span style={{ color: '#EF4444', fontWeight: 'bold' }}>⚠ Melanggar Zonasi</span>
+                          </div>
+                        </Popup>
+                      </CircleMarker>
+                    </MapContainer>
+                  </div>
+                )}
+
                 {/* AI Recommendation */}
                 {aiRecommendation && (
                   <div className="rounded-xl bg-red-900/10 border border-red-500/15 p-4">
@@ -277,6 +333,43 @@ const Calculator = () => {
                   <span className="text-xs text-on-surface-variant uppercase tracking-wider">Tingkat Kepercayaan AI</span>
                   <span className="text-base font-bold text-green-400">{prediction.confidence_percentage}</span>
                 </div>
+
+                {/* Mini Map */}
+                {results?.input?.latitude && results?.input?.longitude && (
+                  <div className="rounded-xl overflow-hidden border border-green-500/20" style={{ height: '220px' }}>
+                    <MapContainer
+                      key={`map-compliance-${results.input.latitude}-${results.input.longitude}`}
+                      center={[results.input.latitude, results.input.longitude]}
+                      zoom={15}
+                      style={{ height: '100%', width: '100%' }}
+                      zoomControl={false}
+                      scrollWheelZoom={false}
+                      attributionControl={false}
+                    >
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                      {/* Radius zona 500m */}
+                      <Circle
+                        center={[results.input.latitude, results.input.longitude]}
+                        radius={THRESHOLD_METER}
+                        pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 0.08, weight: 1.5, dashArray: '5, 5' }}
+                      />
+                      {/* Marker titik calon minimarket */}
+                      <CircleMarker
+                        center={[results.input.latitude, results.input.longitude]}
+                        radius={9}
+                        pathOptions={{ color: '#10B981', fillColor: '#10B981', fillOpacity: 1, weight: 2 }}
+                      >
+                        <Popup>
+                          <div className="text-sm">
+                            <strong>{results.input?.name || 'Calon Minimarket'}</strong><br />
+                            {results.input.latitude.toFixed(6)}, {results.input.longitude.toFixed(6)}<br />
+                            <span style={{ color: '#10B981', fontWeight: 'bold' }}>✓ Aman / Patuh Zonasi</span>
+                          </div>
+                        </Popup>
+                      </CircleMarker>
+                    </MapContainer>
+                  </div>
+                )}
 
                 {/* AI Recommendation */}
                 {aiRecommendation && (
