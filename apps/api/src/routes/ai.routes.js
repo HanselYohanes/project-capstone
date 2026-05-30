@@ -152,7 +152,6 @@ function deriveClusterFeatures({ competitorDensity, jarakKompetitor, nearestDist
 }
 
 async function buildPredictionFeatures(latitude, longitude) {
-    latitude: true,
   const entities = await prisma.entity.findMany({
     select: {
       id: true,
