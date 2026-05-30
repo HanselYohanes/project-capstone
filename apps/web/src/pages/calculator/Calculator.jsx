@@ -71,6 +71,11 @@ const Calculator = () => {
   const isViolation = results?.result?.isViolation;
   const nearestMarkets = results?.allMarkets || [];
 
+  // Data prediksi AI dari ML API
+  const prediction = results?.prediction;
+  const aiRecommendation = results?.ai_recommendation;
+  const isAiViolation = prediction?.is_violation === 1 || prediction?.verdict === 'Violation';
+
   return (
     <div className="bg-background text-on-surface font-body min-h-screen antialiased">
       <Header />
@@ -127,7 +132,168 @@ const Calculator = () => {
           </button>
         </div>
 
-        {/* Result Cards */}
+        {/* ── Calon Minimarket AI Prediction Container ── */}
+        <div
+          className={`rounded-xl border transition-all duration-500 overflow-hidden ${loading
+            ? 'bg-slate-800/40 border-slate-600/30'
+            : prediction && isAiViolation
+              ? 'bg-red-950/30 border-red-500/40 shadow-[0_0_30px_rgba(220,38,38,0.12)]'
+              : prediction && !isAiViolation
+                ? 'bg-green-950/30 border-green-500/40 shadow-[0_0_30px_rgba(34,197,94,0.12)]'
+                : 'glass-panel border-slate-700/30'
+            }`}
+        >
+          {/* Container Header */}
+          <div
+            className={`px-6 py-4 border-b flex items-center gap-3 ${loading
+              ? 'border-slate-600/20'
+              : prediction && isAiViolation
+                ? 'border-red-500/20 bg-red-900/20'
+                : prediction && !isAiViolation
+                  ? 'border-green-500/20 bg-green-900/20'
+                  : 'border-outline-variant/20'
+              }`}
+          >
+            <div
+              className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${loading
+                ? 'bg-slate-700/50'
+                : prediction && isAiViolation
+                  ? 'bg-red-500/20'
+                  : prediction && !isAiViolation
+                    ? 'bg-green-500/20'
+                    : 'bg-purple-500/20'
+                }`}
+            >
+              <span
+                className={`material-symbols-outlined text-base ${loading
+                  ? 'text-slate-400 animate-spin'
+                  : prediction && isAiViolation
+                    ? 'text-red-400'
+                    : prediction && !isAiViolation
+                      ? 'text-green-400'
+                      : 'text-purple-400'
+                  }`}
+              >
+                {loading
+                  ? 'progress_activity'
+                  : prediction && isAiViolation
+                    ? 'gpp_bad'
+                    : prediction && !isAiViolation
+                      ? 'verified'
+                      : 'storefront'}
+              </span>
+            </div>
+            <span className="text-sm font-semibold text-white uppercase tracking-widest">
+              Calon Minimarket
+            </span>
+            {prediction && (
+              <span
+                className={`ml-auto text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider border ${isAiViolation
+                  ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                  : 'bg-green-500/20 text-green-400 border-green-500/30'
+                  }`}
+              >
+                {isAiViolation ? '⚠ Melanggar' : '✓ Aman'}
+              </span>
+            )}
+          </div>
+
+          {/* Container Body */}
+          <div className="px-6 py-5">
+            {/* ─── LOADING STATE ─── */}
+            {loading && (
+              <div className="flex flex-col items-center justify-center gap-3 py-6 text-center">
+                <div className="w-10 h-10 rounded-full border-2 border-slate-600 border-t-purple-500 animate-spin" />
+                <p className="text-sm text-on-surface-variant animate-pulse">
+                  Menganalisis Kepatuhan Tata Ruang...
+                </p>
+              </div>
+            )}
+
+            {/* ─── DEFAULT / IDLE STATE ─── */}
+            {!loading && !prediction && (
+              <div className="flex flex-col items-center justify-center gap-3 py-6 text-center">
+                <span className="material-symbols-outlined text-4xl text-slate-600">location_searching</span>
+                <div>
+                  <p className="text-sm font-medium text-on-surface-variant">Belum ada prediksi</p>
+                  <p className="text-xs text-slate-600 mt-1">
+                    Masukkan koordinat dan klik{' '}
+                    <span className="text-purple-400 font-semibold">Hitung Jarak &amp; Cek Zonasi</span>{' '}
+                    untuk mendapatkan analisis AI.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* ─── VIOLATION STATE ─── */}
+            {!loading && prediction && isAiViolation && (
+              <div className="flex flex-col gap-4 animate-[fadeIn_0.4s_ease]">
+                {/* Verdict Badge */}
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20">
+                  <span className="material-symbols-outlined text-3xl text-red-400">cancel</span>
+                  <div>
+                    <p className="text-lg font-extrabold text-red-400 uppercase tracking-wider leading-tight">
+                      MELANGGAR / TIDAK AMAN
+                    </p>
+                    <p className="text-xs text-red-300/70 mt-0.5">Lokasi ini tidak memenuhi syarat zonasi minimarket</p>
+                  </div>
+                </div>
+
+                {/* Confidence */}
+                <div className="flex items-center justify-between bg-black/20 rounded-lg px-4 py-3">
+                  <span className="text-xs text-on-surface-variant uppercase tracking-wider">Tingkat Kepercayaan AI</span>
+                  <span className="text-base font-bold text-red-400">{prediction.confidence_percentage}</span>
+                </div>
+
+                {/* AI Recommendation */}
+                {aiRecommendation && (
+                  <div className="rounded-xl bg-red-900/10 border border-red-500/15 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="material-symbols-outlined text-sm text-red-400">smart_toy</span>
+                      <span className="text-xs font-semibold text-red-400 uppercase tracking-wider">Rekomendasi AI</span>
+                    </div>
+                    <p className="text-sm text-red-200/80 leading-relaxed">{aiRecommendation}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ─── COMPLIANCE STATE ─── */}
+            {!loading && prediction && !isAiViolation && (
+              <div className="flex flex-col gap-4 animate-[fadeIn_0.4s_ease]">
+                {/* Verdict Badge */}
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/20">
+                  <span className="material-symbols-outlined text-3xl text-green-400">check_circle</span>
+                  <div>
+                    <p className="text-lg font-extrabold text-green-400 uppercase tracking-wider leading-tight">
+                      AMAN / PATUH ZONASI
+                    </p>
+                    <p className="text-xs text-green-300/70 mt-0.5">Lokasi ini memenuhi persyaratan zonasi minimarket</p>
+                  </div>
+                </div>
+
+                {/* Confidence */}
+                <div className="flex items-center justify-between bg-black/20 rounded-lg px-4 py-3">
+                  <span className="text-xs text-on-surface-variant uppercase tracking-wider">Tingkat Kepercayaan AI</span>
+                  <span className="text-base font-bold text-green-400">{prediction.confidence_percentage}</span>
+                </div>
+
+                {/* AI Recommendation */}
+                {aiRecommendation && (
+                  <div className="rounded-xl bg-green-900/10 border border-green-500/15 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="material-symbols-outlined text-sm text-green-400">smart_toy</span>
+                      <span className="text-xs font-semibold text-green-400 uppercase tracking-wider">Rekomendasi AI</span>
+                    </div>
+                    <p className="text-sm text-green-200/80 leading-relaxed">{aiRecommendation}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Result Cards (Haversine distance summary + markets table) ── */}
         {results && nearest && (
           <div className="flex flex-col gap-6 animate-[fadeIn_0.3s_ease]">
             <div className={`rounded-xl p-6 border ${isViolation ? 'bg-red-900/20 border-red-500/40' : 'bg-green-900/20 border-green-500/40'}`}>

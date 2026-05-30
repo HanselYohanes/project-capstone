@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getZoningMapPoints, calculateZoningStatus } from '../controllers/zoning.controller.js';
+import { getZoningMapPoints, calculateZoningStatus, predictZoning } from '../controllers/zoning.controller.js';
 
 const router = Router();
 
@@ -8,5 +8,8 @@ router.get('/points', getZoningMapPoints);
 
 // POST untuk Calculator Zonasi
 router.post('/calculate', calculateZoningStatus);
+
+// POST untuk Prediksi ML On-the-Fly Feature Engineering
+router.post('/predict', predictZoning);
 
 export default router;

@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { validateLatitudeLongitude, haversineDistanceMeters, formatDistance, toNumber } from '../utils/geo.util.js';
+import axios from 'axios';
 
 const DEFAULT_RADIUS = 500;
 
@@ -110,6 +111,87 @@ export const calculateZoningStatus = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Gagal menghitung status zonasi', error: error.message });
+  }
+};
+
+export const predictZoning = async (req, res) => {
+  try {
+    const { latitude, longitude } = req.body;
+    
+    const validation = validateLatitudeLongitude(latitude, longitude);
+    if (!validation.valid) return res.status(400).json({ success: false, message: validation.message });
+
+    const lat = validation.latitude;
+    const lon = validation.longitude;
+
+    // 2. Haversine Calculation
+    const competitors = await prisma.entity.findMany({
+      where: {
+        type: { in: ['MINIMARKET', 'SUPERMARKET'] } // Assuming retail locations are Minimarket & Supermarket
+      }
+    });
+
+    const validCompetitors = competitors.filter(c => c.latitude != null && c.longitude != null);
+    let competitor_density = 0;
+    let minDistance = Infinity;
+
+    validCompetitors.forEach(c => {
+      const dMeters = haversineDistanceMeters(lat, lon, Number(c.latitude), Number(c.longitude));
+      
+      if (dMeters <= 500) {
+        competitor_density += 1;
+      }
+      
+      if (dMeters < minDistance) {
+        minDistance = dMeters;
+      }
+    });
+
+    const jarak_kompetitor = minDistance === Infinity ? 0 : Number(minDistance.toFixed(2));
+    const head_to_head = jarak_kompetitor <= 50 ? 1.0 : 0.0;
+
+    // 3. Cluster Lookup
+    // NOTE: 'ClusterLookup' table does not exist in schema.prisma.
+    // I am mocking these values. If you have a specific table for this, you can replace the query below.
+    let cluster_macro = 0.0;
+    let cluster_hotspot = 0.0;
+    let is_hotspot = 0;
+    
+    // Example of how it would be queried if the table existed:
+    // const nearestCluster = await prisma.$queryRaw`
+    //   SELECT cluster_macro, cluster_hotspot, is_hotspot 
+    //   FROM geographic_cluster_lookup 
+    //   ORDER BY (latitude - ${lat}) * (latitude - ${lat}) + (longitude - ${lon}) * (longitude - ${lon}) ASC 
+    //   LIMIT 1
+    // `;
+    // if (nearestCluster && nearestCluster.length > 0) { ... }
+
+    // 4. Payload Assembly & Forwarding
+    const payload = {
+      latitude: lat,
+      longitude: lon,
+      competitor_density,
+      jarak_kompetitor,
+      head_to_head,
+      cluster_macro,
+      cluster_hotspot,
+      is_hotspot
+    };
+
+    const ML_API_URL = process.env.ML_API_URL || 'http://localhost:5000/api/predict'; // adjust path if needed
+    
+    const mlResponse = await axios.post(ML_API_URL, payload);
+
+    // 5. Response Handling
+    return res.status(200).json(mlResponse.data);
+
+  } catch (error) {
+    console.error('ML API Error:', error.message);
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Failed to predict zoning features', 
+      error: error.response?.data || error.message 
+    });
   }
 };
 
