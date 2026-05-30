@@ -15,6 +15,7 @@ import authRoutes from './routes/auth.routes.js';
 import testRoutes from './routes/test.routes.js';
 import zoningRoutes from './routes/zoning.routes.js';
 import auditRoutes from './routes/audit.routes.js';
+import aiRoutes from './routes/ai.routes.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -43,6 +44,8 @@ app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/zoning', zoningRoutes);
 app.use('/api/v1/audits', auditRoutes);
+app.use('/api/v1/ai', aiRoutes);
+
 // route untuk test middleware authenticate dan isAdmin
 app.use('/api/v1/test', testRoutes);
 
@@ -82,5 +85,6 @@ app.listen(PORT, () => {
   console.log(` API Base: http://localhost:${PORT}/api/v1`);
   console.log(` Health:   http://localhost:${PORT}/api/v1/health`);
   console.log(` Auth:     http://localhost:${PORT}/api/v1/auth`);
+  console.log(` AI:       http://localhost:${PORT}/api/v1/ai`);
   console.log(` Test:     http://localhost:${PORT}/api/v1/test\n`);
 });

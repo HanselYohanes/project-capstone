@@ -64,3 +64,9 @@ export const formatDistance = (distanceMeters) => {
     kilometers: Number((distanceMeters / 1000).toFixed(3)),
   };
 };
+
+// tambahan kecil utility untuk feature engineering otomatis
+export const isValidLatitude = (lat) => typeof lat === 'number' && !isNaN(lat) && lat >= -90 && lat <= 90;
+export const isValidLongitude = (lon) => typeof lon === 'number' && !isNaN(lon) && lon >= -180 && lon <= 180;
+
+export const roundNumber = (value, digits = 2) => Number(Number(value).toFixed(digits));
