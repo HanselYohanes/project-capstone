@@ -248,83 +248,80 @@ async function buildPredictionFeatures(latitude, longitude) {
 
 // POST /api/v1/ai/predict
 // POST /api/v1/ai/predict
+// POST /api/v1/ai/predict
 router.post('/predict', async (req, res, next) => {
   try {
     const latitude = Number(req.body.latitude);
     const longitude = Number(req.body.longitude);
 
     if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Latitude dan longitude tidak valid',
-      });
+      return res.status(400).json({ success: false, message: 'Latitude dan longitude tidak valid' });
     }
 
-    // 1. Ekstrak fitur kompetitor untuk AI
     const features = await buildPredictionFeatures(latitude, longitude);
+    const aiResponse = await axios.post(`${AI_SERVICE_URL}/api/zonasi/predict`, features, { timeout: 15000 });
 
-    // 2. Tembak AI Service Python
-    const aiResponse = await axios.post(
-      `${AI_SERVICE_URL}/api/zonasi/predict`,
-      features,
-      { timeout: 15000 }
+    // 1. Ambil data pasar secara agresif
+    const semuaEntity = await prisma.entity.findMany();
+    const pasarEntities = semuaEntity.filter(e =>
+      (e.type && String(e.type).toUpperCase() === 'PASAR') ||
+      (e.store && String(e.store).toUpperCase().includes('PASAR')) ||
+      (e.name && String(e.name).toUpperCase().includes('PASAR'))
     );
 
-    // --- MULA GUARDRAIL 500m PASAR TRADISIONAL ---
-    // 3. Ambil semua data pasar dari database untuk divalidasi manual oleh sistem Node.js
-    const pasarEntities = await prisma.entity.findMany({
-      where: { type: 'PASAR' }
-    });
+    // 2. BUNGKUS KE DALAM OBJEK (Sesuai ekspektasi Front-End)
+    let finalAIObject = {
+      prediction: 'AMAN',
+      ai_recommendation: 'Lokasi aman dari pelanggaran zonasi.'
+    };
 
-    let jarakTerdekat = 999999;
-    let namaPasarTerdekat = '';
+    // Ambil data asli dari Python jika ada
+    if (aiResponse.data && typeof aiResponse.data === 'object') {
+      finalAIObject.prediction = aiResponse.data.prediction || 'AMAN';
+      finalAIObject.ai_recommendation = aiResponse.data.ai_recommendation || 'Aman';
+    }
 
-    // Hitung jarak ke setiap pasar menggunakan utilitas Haversine yang sudah ada
-    for (const pasar of pasarEntities) {
-      if (isValidLatitude(Number(pasar.latitude)) && isValidLongitude(Number(pasar.longitude))) {
-        const jarak = haversineDistanceMeters(latitude, longitude, Number(pasar.latitude), Number(pasar.longitude));
-        if (jarak < jarakTerdekat) {
-          jarakTerdekat = jarak;
-          namaPasarTerdekat = pasar.name;
+    // 3. HITUNG JARAK MUTLAK
+    if (pasarEntities.length === 0) {
+      // Jika database benar-benar kosong
+      finalAIObject.prediction = "MELANGGAR";
+      finalAIObject.ai_recommendation = "🚨 ERROR BACKEND: Data Pasar KOSONG di Database! Tolong pastikan database sudah di-seed.";
+    } else {
+      let jarakTerdekat = 999999;
+      let namaPasarTerdekat = '';
+
+      for (const pasar of pasarEntities) {
+        const latPasar = Number(pasar.latitude);
+        const lonPasar = Number(pasar.longitude);
+
+        if (isValidLatitude(latPasar) && isValidLongitude(lonPasar)) {
+          const jarak = haversineDistanceMeters(latitude, longitude, latPasar, lonPasar);
+          if (jarak < jarakTerdekat) {
+            jarakTerdekat = jarak;
+            namaPasarTerdekat = pasar.name;
+          }
         }
+      }
+
+      // 4. GUARDRAIL 500 METER
+      if (jarakTerdekat < 500) {
+        finalAIObject.prediction = "MELANGGAR"; // Masukkan ke dalam objek final
+        finalAIObject.ai_recommendation = `🚨 Sistem Zonify: Lokasi ini melanggar karena berjarak hanya ${jarakTerdekat.toFixed(2)} meter dari ${namaPasarTerdekat} (Batas min 500m).`;
       }
     }
 
-    // 4. Siapkan struktur respons
-    // Menyesuaikan dengan format { prediction, ai_recommendation } yang ditangkap frontend
-    let finalPrediction = aiResponse.data.prediction || 'AMAN';
-    let finalRecommendation = aiResponse.data.ai_recommendation || 'Lokasi aman dari pelanggaran zonasi.';
-
-    // OVERRIDE: Jika secara matematis jarak ke pasar < 500 meter, paksa menjadi MELANGGAR
-    if (jarakTerdekat < 500) {
-      finalPrediction = "MELANGGAR";
-      finalRecommendation = `Peringatan Sistem Zonify: Lokasi ini melanggar aturan zonasi karena hanya berjarak ${jarakTerdekat.toFixed(2)} meter dari ${namaPasarTerdekat} (Batas minimal adalah 500 meter).`;
-    }
-    // --- AKHIR GUARDRAIL ---
-
+    // 5. KIRIM DATA KE FRONT-END
     res.json({
       success: true,
       message: 'Prediksi berhasil',
       data: {
-        input: {
-          latitude,
-          longitude,
-        },
+        input: { latitude, longitude },
         generatedFeatures: features,
-        // Kirimkan hasil yang sudah melewati penjagaan sistem
-        prediction: finalPrediction,
-        ai_recommendation: finalRecommendation
+        // KUNCI PERBAIKAN: prediction sekarang berisi OBJEK utuh, bukan string rata!
+        prediction: finalAIObject
       },
     });
   } catch (err) {
-    if (err.response) {
-      err.status = err.response.status || 500;
-      err.message =
-        err.response.data?.message ||
-        err.response.data?.error ||
-        'Gagal melakukan prediksi AI';
-    }
-
     next(err);
   }
 });
