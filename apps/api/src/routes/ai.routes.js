@@ -152,33 +152,34 @@ function deriveClusterFeatures({ competitorDensity, jarakKompetitor, nearestDist
 }
 
 async function buildPredictionFeatures(latitude, longitude) {
-const entities = await prisma.entity.findMany({
-  select: {
-    id: true,
-    name: true,
-    type: true,
-    store: true,
     latitude: true,
-    longitude: true,
-    district: {
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        saturationPercent: true,
+  const entities = await prisma.entity.findMany({
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      store: true,
+      latitude: true,
+      longitude: true,
+      district: {
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          saturationPercent: true,
+        },
       },
     },
-  },
-});
+  });
 
-// filter secara manual di JS supaya latitude & longitude valid
-const validEntities = entities.filter(
-  (e) =>
-    typeof e.latitude === 'number' &&
-    !isNaN(e.latitude) &&
-    typeof e.longitude === 'number' &&
-    !isNaN(e.longitude)
-);
+  // filter secara manual di JS supaya latitude & longitude valid
+  const validEntities = entities.filter(
+    (e) =>
+      typeof e.latitude === 'number' &&
+      !isNaN(e.latitude) &&
+      typeof e.longitude === 'number' &&
+      !isNaN(e.longitude)
+  );
 
   const competitors = entities
     .filter((entity) => {
@@ -247,6 +248,7 @@ const validEntities = entities.filter(
 }
 
 // POST /api/v1/ai/predict
+// POST /api/v1/ai/predict
 router.post('/predict', async (req, res, next) => {
   try {
     const latitude = Number(req.body.latitude);
@@ -259,15 +261,47 @@ router.post('/predict', async (req, res, next) => {
       });
     }
 
+    // 1. Ekstrak fitur kompetitor untuk AI
     const features = await buildPredictionFeatures(latitude, longitude);
 
+    // 2. Tembak AI Service Python
     const aiResponse = await axios.post(
       `${AI_SERVICE_URL}/api/zonasi/predict`,
       features,
-      {
-        timeout: 15000,
-      }
+      { timeout: 15000 }
     );
+
+    // --- MULA GUARDRAIL 500m PASAR TRADISIONAL ---
+    // 3. Ambil semua data pasar dari database untuk divalidasi manual oleh sistem Node.js
+    const pasarEntities = await prisma.entity.findMany({
+      where: { type: 'PASAR' }
+    });
+
+    let jarakTerdekat = 999999;
+    let namaPasarTerdekat = '';
+
+    // Hitung jarak ke setiap pasar menggunakan utilitas Haversine yang sudah ada
+    for (const pasar of pasarEntities) {
+      if (isValidLatitude(Number(pasar.latitude)) && isValidLongitude(Number(pasar.longitude))) {
+        const jarak = haversineDistanceMeters(latitude, longitude, Number(pasar.latitude), Number(pasar.longitude));
+        if (jarak < jarakTerdekat) {
+          jarakTerdekat = jarak;
+          namaPasarTerdekat = pasar.name;
+        }
+      }
+    }
+
+    // 4. Siapkan struktur respons
+    // Menyesuaikan dengan format { prediction, ai_recommendation } yang ditangkap frontend
+    let finalPrediction = aiResponse.data.prediction || 'AMAN';
+    let finalRecommendation = aiResponse.data.ai_recommendation || 'Lokasi aman dari pelanggaran zonasi.';
+
+    // OVERRIDE: Jika secara matematis jarak ke pasar < 500 meter, paksa menjadi MELANGGAR
+    if (jarakTerdekat < 500) {
+      finalPrediction = "MELANGGAR";
+      finalRecommendation = `Peringatan Sistem Zonify: Lokasi ini melanggar aturan zonasi karena hanya berjarak ${jarakTerdekat.toFixed(2)} meter dari ${namaPasarTerdekat} (Batas minimal adalah 500 meter).`;
+    }
+    // --- AKHIR GUARDRAIL ---
 
     res.json({
       success: true,
@@ -278,7 +312,9 @@ router.post('/predict', async (req, res, next) => {
           longitude,
         },
         generatedFeatures: features,
-        prediction: aiResponse.data,
+        // Kirimkan hasil yang sudah melewati penjagaan sistem
+        prediction: finalPrediction,
+        ai_recommendation: finalRecommendation
       },
     });
   } catch (err) {
@@ -293,5 +329,51 @@ router.post('/predict', async (req, res, next) => {
     next(err);
   }
 });
+// router.post('/predict', async (req, res, next) => {
+//   try {
+//     const latitude = Number(req.body.latitude);
+//     const longitude = Number(req.body.longitude);
+
+//     if (!isValidLatitude(latitude) || !isValidLongitude(longitude)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: 'Latitude dan longitude tidak valid',
+//       });
+//     }
+
+//     const features = await buildPredictionFeatures(latitude, longitude);
+
+//     const aiResponse = await axios.post(
+//       `${AI_SERVICE_URL}/api/zonasi/predict`,
+//       features,
+//       {
+//         timeout: 15000,
+//       }
+//     );
+
+//     res.json({
+//       success: true,
+//       message: 'Prediksi berhasil',
+//       data: {
+//         input: {
+//           latitude,
+//           longitude,
+//         },
+//         generatedFeatures: features,
+//         prediction: aiResponse.data,
+//       },
+//     });
+//   } catch (err) {
+//     if (err.response) {
+//       err.status = err.response.status || 500;
+//       err.message =
+//         err.response.data?.message ||
+//         err.response.data?.error ||
+//         'Gagal melakukan prediksi AI';
+//     }
+
+//     next(err);
+//   }
+// });
 
 export default router;
