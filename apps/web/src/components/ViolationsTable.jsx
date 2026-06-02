@@ -153,7 +153,7 @@ const ViolationsTable = ({ hideAction = false }) => {
                   displayDistrict = typeof row.entity.district === 'object' ? (row.entity.district.name || "-") : row.entity.district;
                 }
 
-                const styleConfig = getStatusStyle(row.distanceToMarket || row.jarak || 350);
+                const styleConfig = getStatusStyle(row.distanceToMarket || row.jarak || 500);
 
                 return (
                   <tr key={row.id || displayId} className="hover:bg-white/[0.02] transition-colors">
