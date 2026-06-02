@@ -11,17 +11,9 @@ const Header = ({ onSearch }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  // 🔥 STATE NOTIF
-  const [showNotif, setShowNotif] = useState(false);
-
   // 🔥 STATE SEARCH
   const [search, setSearch] = useState("");
 
-  const notifications = [
-    "Tebet masuk CRITICAL",
-    "5 lokasi violation baru",
-    "Data berhasil diperbarui"
-  ];
 
   return (
     <header className="relative flex items-center justify-between px-8 py-3 ml-64 w-[calc(100%-16rem)] sticky top-0 z-30 bg-[#0b1326]/60 backdrop-blur-md h-16 border-b border-white/5 shadow-none">
@@ -54,31 +46,6 @@ const Header = ({ onSearch }) => {
       {/* Actions & Profile */}
       <div className="flex items-center gap-4">
 
-        {/* 🔔 NOTIFICATION */}
-        <div className="relative">
-          <button
-            onClick={() => setShowNotif(!showNotif)}
-            className="p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors relative"
-          >
-            <span className="material-symbols-outlined">notifications</span>
-
-            <span className="absolute top-1 right-1 text-[10px] bg-primary text-white px-1.5 rounded-full">
-              {notifications.length}
-            </span>
-          </button>
-
-          {showNotif && (
-            <div className="absolute right-0 top-12 w-72 bg-[#1e293b] text-white p-4 rounded-xl shadow-xl border border-white/10 z-50 text-sm">
-              <h3 className="font-bold mb-2">Notifications</h3>
-
-              {notifications.map((notif, i) => (
-                <div key={i} className="py-1 border-b border-white/5 last:border-none">
-                  {notif}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* ❓ HELP */}
         <button
@@ -94,37 +61,25 @@ const Header = ({ onSearch }) => {
 
             <h2 className="text-lg font-bold text-primary-container">Zonify Help</h2>
 
-            <div>
-              <p className="font-semibold">📊 Dashboard</p>
-              <p>• Violations = jumlah pelanggaran jarak antar minimarket</p>
-              <p>• Safe Locations = lokasi yang tidak melanggar aturan</p>
-              <p>• Compliance Rate = persentase lokasi aman</p>
-            </div>
+            <p className="text-gray-300 leading-relaxed">
+              Selamat datang di Zonify! Sistem ini dirancang untuk membantumu memantau dan
+              menganalisis kepadatan lokasi ritel agar sesuai dengan aturan zonasi jarak ideal.
+              Lewat platform ini, kamu bisa melihat gambaran besar data di{' '}
+              <span className="text-white font-semibold">Dashboard</span>, mengecek titik lokasi
+              spesifik beserta radius amannya melalui{' '}
+              <span className="text-white font-semibold">Map</span>, dan mengidentifikasi area mana
+              saja yang sudah terlalu padat di halaman{' '}
+              <span className="text-white font-semibold">Rankings</span>.
+            </p>
 
-            <div>
-              <p className="font-semibold">🗺️ Map</p>
-              <p>• Klik titik untuk melihat detail lokasi</p>
-              <p>• Lingkaran merah = radius aturan (500m)</p>
-              <p>• Jika overlap → dianggap violation</p>
-            </div>
-
-            <div>
-              <p className="font-semibold">⚠️ Status</p>
-              <p>• CRITICAL → pelanggaran tinggi</p>
-              <p>• WARNING → mendekati batas</p>
-              <p>• SAFE → tidak ada pelanggaran</p>
-            </div>
-
-            <div>
-              <p className="font-semibold">📏 Rules</p>
-              <p>• Radius minimal antar minimarket: 500 meter</p>
-              <p>• Overlap → over-saturation</p>
-            </div>
-
-            <div>
-              <p className="font-semibold">🎯 Tujuan</p>
-              <p>Zonify membantu analisis kepadatan retail untuk mencegah over-saturation.</p>
-            </div>
+            <p className="text-gray-300 leading-relaxed">
+              Jika ada lokasi yang jaraknya terlalu berdekatan atau tumpang tindih, sistem akan
+              otomatis mendeteksinya sebagai pelanggaran dan mencatatnya di menu{' '}
+              <span className="text-white font-semibold">Violations</span> serta{' '}
+              <span className="text-white font-semibold">Audit Logs</span>. Intinya, Zonify hadir
+              untuk memberikan insight yang jelas agar kamu bisa mencegah terjadinya
+              over-saturasi ritel di suatu wilayah.
+            </p>
 
           </div>
         )}
