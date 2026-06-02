@@ -118,15 +118,14 @@ const Calculator = () => {
   const isViolation = results?.result?.isViolation;
   const nearestMarkets = results?.allMarkets || [];
 
+  // Data prediksi AI dari ML API — MUST be declared before retailCount (TDZ fix)
+  const prediction = results?.prediction;
+
   // Jumlah retail kompetitor dalam 500m — dari generatedFeatures yang diisi oleh /ai/predict
   const retailCount =
     results?.generatedFeatures?.competitor_density ??
     prediction?.competitor_density ??
     null;
-
-  // Data prediksi AI dari ML API
-  // Data prediksi AI dari ML API
-  const prediction = results?.prediction;
 
   // Ekstrak rekomendasi (cover berbagai kemungkinan format JSON dari backend)
   const aiRecommendation = results?.ai_recommendation || prediction?.ai_recommendation;
@@ -394,7 +393,7 @@ const Calculator = () => {
                       <div className="bg-black/20 rounded-lg px-4 py-2.5">
                         <p className="text-[10px] text-on-surface-variant uppercase tracking-wider mb-0.5">Status Zona</p>
                         <p className={`text-sm font-bold ${aiRec.zoneStatus === 'Aman' ? 'text-green-400' :
-                            aiRec.zoneStatus === 'Melanggar' ? 'text-red-400' : 'text-yellow-400'
+                          aiRec.zoneStatus === 'Melanggar' ? 'text-red-400' : 'text-yellow-400'
                           }`}>{aiRec.zoneStatus}</p>
                       </div>
                       <div className="bg-black/20 rounded-lg px-4 py-2.5">
@@ -560,7 +559,7 @@ const Calculator = () => {
                           <div className="bg-black/20 rounded-lg px-4 py-2.5">
                             <p className="text-[10px] text-on-surface-variant uppercase tracking-wider mb-0.5">Status Zona</p>
                             <p className={`text-sm font-bold ${aiRec.zoneStatus === 'Aman' ? 'text-green-400' :
-                                aiRec.zoneStatus === 'Melanggar' ? 'text-red-400' : 'text-yellow-400'
+                              aiRec.zoneStatus === 'Melanggar' ? 'text-red-400' : 'text-yellow-400'
                               }`}>{aiRec.zoneStatus}</p>
                           </div>
                           <div className="bg-black/20 rounded-lg px-4 py-2.5">
