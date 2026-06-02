@@ -1,16 +1,22 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, useEffect } from "react";
 
 const AuthContext = createContext();
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 export const AuthProvider = ({ children }) => {
+    const [loading, setLoading] = useState(true);
 
     // 🔥 LOAD DARI LOCALSTORAGE (AUTO LOGIN)
     const [user, setUser] = useState(() => {
         const savedUser = localStorage.getItem("user");
         return savedUser ? JSON.parse(savedUser) : null;
     });
+
+    useEffect(() => {
+        // Normally verify token with backend here; for now we finish init
+        setLoading(false);
+    }, []);
 
     // 🔥 LOGIN — async, panggil API backend
     const login = async (email, password) => {
@@ -60,7 +66,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, login, logout }}>
+        <AuthContext.Provider value={{ user, login, logout, loading }}>
             {children}
         </AuthContext.Provider>
     );

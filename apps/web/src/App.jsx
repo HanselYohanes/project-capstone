@@ -31,9 +31,9 @@ function App() {
         <Route
           path="/analytics"
           element={
-            <RequireAdmin>
+            <ProtectedRoute>
               <Analytics />
-            </RequireAdmin>
+            </ProtectedRoute>
           }
         />
 

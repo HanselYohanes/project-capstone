@@ -18,8 +18,16 @@ export const RequireAuth = () => {
 };
 
 export const RequireAdmin = () => {
-  const { user } = useAuth();
-  if (!user?.isAdmin) return <Navigate to="/" replace />;
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <div className="p-8 text-center text-white">Loading...</div>;
+  }
+
+  if (!user || !user.isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
   return <Outlet />;
 };
 

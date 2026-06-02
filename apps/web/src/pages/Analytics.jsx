@@ -300,12 +300,15 @@ function RankingMatrix({ rows, loading }) {
 }
 
 // Maps button index → display label and API query string value
-const TIMEFRAME_OPTIONS = ['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'This Year'];
-const TIMEFRAME_KEYS = ['7d', '30d', '90d', '1y'];
+const TIMEFRAME_OPTIONS = [
+  { label: "Last 7 Days", value: "7d" },
+  { label: "Last 30 Days", value: "30d" },
+  { label: "Last 90 Days", value: "90d" }
+];
 
 const Analytics = () => {
   const [timeframeIdx, setTimeframeIdx] = useState(1); // Default: Last 30 Days
-  const timeframe = TIMEFRAME_KEYS[timeframeIdx] ?? '30d';
+  const timeframe = TIMEFRAME_OPTIONS[timeframeIdx]?.value ?? '30d';
 
   const { data, loading } = useAnalyticsData(timeframe);
   const { kpis, saturation, trends, rankingMatrix, comparison } = data;
@@ -395,14 +398,14 @@ const Analytics = () => {
             <div className="flex items-center gap-1 glass-panel rounded-lg p-1">
               {TIMEFRAME_OPTIONS.map((opt, i) => (
                 <button
-                  key={opt}
+                  key={opt.value}
                   onClick={() => setTimeframeIdx(i)}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${i === timeframeIdx
-                    ? 'bg-primary/20 text-primary border border-primary/30'
+                    ? 'bg-primary/20 text-primary glow-primary border border-primary/30'
                     : 'text-on-surface-variant hover:text-white hover:bg-white/5'
                     }`}
                 >
-                  {opt}
+                  {opt.label}
                 </button>
               ))}
             </div>
