@@ -87,7 +87,7 @@ const Rankings = () => {
     // Title
     doc.setFontSize(18);
     doc.setTextColor(30, 30, 60);
-    doc.text('ZONIFY â€” District Saturation Report', 40, 50);
+    doc.text('ZONIFY District Saturation Report', 40, 50);
 
     // Subtitle / generated date
     doc.setFontSize(9);
