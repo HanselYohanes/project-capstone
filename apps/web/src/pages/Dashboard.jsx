@@ -65,7 +65,7 @@ const Dashboard = () => {
         </div>
 
         {/* ── Violations Table ────────────────────────── */}
-        <ViolationsTable />
+        <ViolationsTable hideAction={true} />
 
         {/* ── Audit Summary ────────────────────────────── */}
         <div className="mt-8">

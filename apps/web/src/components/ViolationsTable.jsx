@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext';
 // 🔧 Sesuaikan URL base dengan env kamu
 const API_BASE = `${import.meta.env.VITE_API_URL ?? "http://localhost:3001"}/api/v1`;
 
-const ViolationsTable = () => {
+const ViolationsTable = ({ hideAction = false }) => {
+
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -107,20 +108,20 @@ const ViolationsTable = () => {
               <th className="px-6 py-4 font-medium">District</th>
               <th className="px-6 py-4 font-medium">Proximity Rule</th>
               <th className="px-6 py-4 font-medium">Status</th>
-              <th className="px-6 py-4 font-medium text-right">Action</th>
+              {!hideAction && <th className="px-6 py-4 font-medium text-right">Action</th>}
             </tr>
           </thead>
 
           <tbody className="text-sm divide-y divide-outline-variant/10">
             {loading ? (
               <tr>
-                <td colSpan="6" className="text-center py-8 text-on-surface-variant animate-pulse">
+                <td colSpan={hideAction ? 5 : 6} className="text-center py-8 text-on-surface-variant animate-pulse">
                   Menghubungkan ke server retail intelligence...
                 </td>
               </tr>
             ) : violations.length === 0 ? (
               <tr>
-                <td colSpan="6" className="text-center py-8 text-on-surface-variant">
+                <td colSpan={hideAction ? 5 : 6} className="text-center py-8 text-on-surface-variant">
                   Tidak ada riwayat pelanggaran zonasi yang terdeteksi.
                 </td>
               </tr>
@@ -169,47 +170,49 @@ const ViolationsTable = () => {
                       </span>
                     </td>
 
-                    {/* ── Kotak Dropdown Aksi ── */}
-                    <td className="px-6 py-4 text-right relative">
-                      <button
-                        onClick={() => toggleDropdown(row.id || displayId)}
-                        className="text-on-surface-variant hover:text-primary transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-lg">more_vert</span>
-                      </button>
+                    {/* ── Action cell (hidden on Dashboard) ── */}
+                    {!hideAction && (
+                      <td className="px-6 py-4 text-right relative">
+                        <button
+                          onClick={() => toggleDropdown(row.id || displayId)}
+                          className="text-on-surface-variant hover:text-primary transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-lg">more_vert</span>
+                        </button>
 
-                      {openDropdown === (row.id || displayId) && (
-                        <div className="absolute right-4 top-full mt-1 z-50 min-w-[160px] bg-surface-container rounded-lg shadow-xl border border-outline-variant/20 py-1 text-left">
-                          <button
-                            onClick={() => { navigate('/violations'); setOpenDropdown(null); }}
-                            className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-on-surface hover:bg-white/5 transition-colors"
-                          >
-                            <span className="material-symbols-outlined text-[15px] text-on-surface-variant">open_in_new</span>
-                            View Details
-                          </button>
+                        {openDropdown === (row.id || displayId) && (
+                          <div className="absolute right-4 top-full mt-1 z-50 min-w-[160px] bg-surface-container rounded-lg shadow-xl border border-outline-variant/20 py-1 text-left">
+                            <button
+                              onClick={() => { navigate('/violations'); setOpenDropdown(null); }}
+                              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-on-surface hover:bg-white/5 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[15px] text-on-surface-variant">open_in_new</span>
+                              View Details
+                            </button>
 
-                          {user?.isAdmin && (
-                            <>
-                              <div className="my-1 border-t border-outline-variant/15" />
-                              <button
-                                onClick={() => { alert(`Edit: #${displayId}`); setOpenDropdown(null); }}
-                                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-blue-400 hover:bg-blue-500/10 transition-colors"
-                              >
-                                <span className="material-symbols-outlined text-[15px]">edit</span>
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => { alert(`Hapus: #${displayId}`); setOpenDropdown(null); }}
-                                className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-error hover:bg-error/10 transition-colors"
-                              >
-                                <span className="material-symbols-outlined text-[15px]">delete</span>
-                                Delete
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </td>
+                            {user?.isAdmin && (
+                              <>
+                                <div className="my-1 border-t border-outline-variant/15" />
+                                <button
+                                  onClick={() => { alert(`Edit: #${displayId}`); setOpenDropdown(null); }}
+                                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-blue-400 hover:bg-blue-500/10 transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[15px]">edit</span>
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => { alert(`Hapus: #${displayId}`); setOpenDropdown(null); }}
+                                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-error hover:bg-error/10 transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[15px]">delete</span>
+                                  Delete
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })
@@ -224,7 +227,6 @@ const ViolationsTable = () => {
 
 export default ViolationsTable;
 
-// import React, { useState, useEffect, useRef } from 'react';
 // import { useNavigate } from "react-router-dom";
 // import { useAuth } from '../context/AuthContext';
 
