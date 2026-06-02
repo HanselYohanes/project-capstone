@@ -3,13 +3,29 @@ import prisma from '../config/database.js';
 
 const router = Router();
 
+// ─── Timeframe Helper ────────────────────────────────────────────────────────
+// Returns a Date representing the start of the requested window, or null for 'all time'.
+function getStartDate(timeframe) {
+  const now = new Date();
+  switch (timeframe) {
+    case '7d':  { const d = new Date(now); d.setDate(d.getDate() - 7);   return d; }
+    case '30d': { const d = new Date(now); d.setDate(d.getDate() - 30);  return d; }
+    case '90d': { const d = new Date(now); d.setDate(d.getDate() - 90);  return d; }
+    case '1y':  { const d = new Date(now.getFullYear(), 0, 1);           return d; } // Jan 1st
+    default:    { const d = new Date(now); d.setDate(d.getDate() - 30);  return d; } // fallback 30d
+  }
+}
+
 // GET /api/v1/analytics/kpis
 router.get('/kpis', async (req, res, next) => {
   try {
+    const startDate = getStartDate(req.query.timeframe);
+    const dateFilter = { gte: startDate };
+
     const [totalAudits, overSaturatedZones, activeViolations, entities] = await Promise.all([
-      prisma.audit.count(),
+      prisma.audit.count({ where: { createdAt: dateFilter } }),
       prisma.district.count({ where: { saturationPercent: { gte: 80 } } }),
-      prisma.violation.count({ where: { status: 'ACTIVE' } }),
+      prisma.violation.count({ where: { status: 'ACTIVE', detectedAt: dateFilter } }),
       prisma.entity.findMany({ select: { complianceScore: true } }),
     ]);
 
@@ -32,7 +48,18 @@ router.get('/kpis', async (req, res, next) => {
 // GET /api/v1/analytics/saturation-by-district
 router.get('/saturation-by-district', async (req, res, next) => {
   try {
+    // saturationPercent is a district-level aggregate; timeframe not directly applicable here,
+    // but we filter by districts that have violations within the window.
+    const startDate = getStartDate(req.query.timeframe);
+    const districtIds = await prisma.violation.findMany({
+      where: { detectedAt: { gte: startDate } },
+      select: { districtId: true },
+      distinct: ['districtId'],
+    }).then(rows => rows.map(r => r.districtId).filter(Boolean));
+
+    const where = districtIds.length > 0 ? { id: { in: districtIds } } : {};
     const districts = await prisma.district.findMany({
+      where,
       orderBy: { saturationPercent: 'desc' },
       select: { name: true, saturationPercent: true, status: true },
     });
@@ -43,7 +70,9 @@ router.get('/saturation-by-district', async (req, res, next) => {
 // GET /api/v1/analytics/violation-trends
 router.get('/violation-trends', async (req, res, next) => {
   try {
+    const startDate = getStartDate(req.query.timeframe);
     const logs = await prisma.saturationLog.findMany({
+      where: { recordedAt: { gte: startDate } },
       orderBy: { recordedAt: 'asc' },
       include: { district: { select: { name: true } } },
     });
@@ -350,27 +379,14 @@ router.get('/map-points', async (req, res, next) => {
 // GET /api/v1/violations/ranking-matrix
 router.get('/ranking-matrix', async (req, res, next) => {
   try {
+    const startDate = getStartDate(req.query.timeframe);
     const violations = await prisma.violation.findMany({
+      where: { detectedAt: { gte: startDate } },
       include: {
-        entity: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            store: true,
-          },
-        },
-        district: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
+        entity: { select: { id: true, name: true, type: true, store: true } },
+        district: { select: { id: true, name: true } },
       },
-      orderBy: [
-        { severity: 'asc' },
-        { detectedAt: 'desc' },
-      ],
+      orderBy: [{ severity: 'asc' }, { detectedAt: 'desc' }],
     });
 
     const severityScore = {

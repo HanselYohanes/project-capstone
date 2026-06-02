@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 
@@ -13,6 +13,45 @@ const Header = ({ onSearch }) => {
 
   // 🔥 STATE SEARCH
   const [search, setSearch] = useState("");
+
+  // 🔥 STATE NOTIF
+  const [notifications, setNotifications] = useState([]);
+  const [showNotif, setShowNotif] = useState(false);
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+  const notifRef = useRef(null);
+
+  // fetch notifications
+  const fetchNotifications = async () => {
+    try {
+      const token = user?.token || JSON.parse(localStorage.getItem("user"))?.token;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const res = await fetch(`${import.meta.env.VITE_API_URL ?? 'http://localhost:3001'}/api/v1/notifications`, { headers });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json.success) {
+        setNotifications(json.data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000); // Poll every 30 seconds
+    return () => clearInterval(interval);
+  }, [user]);
+
+  // Click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotif(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
 
   return (
@@ -46,6 +85,76 @@ const Header = ({ onSearch }) => {
       {/* Actions & Profile */}
       <div className="flex items-center gap-4">
 
+        {/* 🔔 NOTIFICATIONS */}
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => setShowNotif(!showNotif)}
+            className="relative p-2 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+          >
+            <span className="material-symbols-outlined">notifications</span>
+            {unreadCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full outline outline-2 outline-[#0b1326]"></span>
+            )}
+          </button>
+
+          {/* DROPDOWN NOTIFICATIONS */}
+          {showNotif && (
+            <div className="absolute top-14 right-0 w-80 bg-[#1e293b] rounded-xl shadow-2xl border border-white/10 z-50 overflow-hidden">
+              <div className="p-4 border-b border-white/10 flex justify-between items-center bg-slate-800/50">
+                <h3 className="font-bold text-white text-sm">Notifications</h3>
+                {unreadCount > 0 && (
+                  <span className="text-xs bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-medium">
+                    {unreadCount} New
+                  </span>
+                )}
+              </div>
+              <div className="max-h-[320px] overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400 text-sm">
+                    No new notifications
+                  </div>
+                ) : (
+                  notifications.map((notif) => (
+                    <div
+                      key={notif.id}
+                      className={`p-4 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer flex gap-3 ${!notif.isRead ? 'bg-white/[0.02]' : ''}`}
+                    >
+                      <div className={`mt-0.5 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${notif.type === 'CRITICAL' ? 'bg-red-500/20 text-red-400' :
+                          notif.type === 'WARNING' ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-blue-500/20 text-blue-400'
+                        }`}>
+                        <span className="material-symbols-outlined text-sm">
+                          {notif.type === 'CRITICAL' ? 'warning' :
+                            notif.type === 'WARNING' ? 'error_outline' :
+                              'info'}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm truncate ${notif.type === 'CRITICAL' ? 'text-red-400 font-medium' : 'text-slate-200'}`}>
+                          {notif.title}
+                        </p>
+                        <p className="text-xs text-slate-400 mt-0.5 line-clamp-2 leading-relaxed">
+                          {notif.message}
+                        </p>
+                        <p className="text-[10px] text-slate-500 mt-2 font-medium uppercase tracking-wider">
+                          {new Date(notif.time).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="p-2 border-t border-white/10 bg-slate-800/50">
+                <button
+                  className="w-full py-2 text-xs font-medium text-slate-300 hover:text-white transition-colors"
+                  onClick={() => setShowNotif(false)}
+                >
+                  Mark all as read
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* ❓ HELP */}
         <button

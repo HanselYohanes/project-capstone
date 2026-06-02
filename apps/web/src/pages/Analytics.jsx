@@ -7,7 +7,7 @@ import Header from '../components/Header';
 const API_BASE = `${import.meta.env.VITE_API_URL ?? 'http://localhost:3001'}/api/v1`;
 
 // ─── Data Fetching Hook ───────────────────────────────────
-function useAnalyticsData() {
+function useAnalyticsData(timeframe = '30d') {
   const navigate = useNavigate();
   const [data, setData] = useState({
     kpis: null,
@@ -39,13 +39,14 @@ function useAnalyticsData() {
           ...getAuthHeader(),
         };
 
-        // 🌐 5 endpoint paralel — ubah path di sini jika routing backend berubah
+        // 🌐 5 endpoint paralel — timeframe query param injected into every URL
+        const qs = `timeframe=${timeframe}`;
         const [kpisRes, satRes, trendsRes, matrixRes, compRes] = await Promise.all([
-          fetch(`${API_BASE}/analytics/kpis`, { headers }),
-          fetch(`${API_BASE}/analytics/saturation-by-district`, { headers }),
-          fetch(`${API_BASE}/analytics/violation-trends`, { headers }),
-          fetch(`${API_BASE}/analytics/ranking-matrix`, { headers }),
-          fetch(`${API_BASE}/analytics/district-comparison`, { headers }),
+          fetch(`${API_BASE}/analytics/kpis?${qs}`, { headers }),
+          fetch(`${API_BASE}/analytics/saturation-by-district?${qs}`, { headers }),
+          fetch(`${API_BASE}/analytics/violation-trends?${qs}`, { headers }),
+          fetch(`${API_BASE}/analytics/ranking-matrix?${qs}`, { headers }),
+          fetch(`${API_BASE}/analytics/district-comparison?${qs}`, { headers }),
         ]);
 
         // ⚠️ Tangani 401/403: sesi habis → bersihkan localStorage & redirect login
@@ -82,10 +83,11 @@ function useAnalyticsData() {
     };
 
     fetchAll();
-  }, [navigate]);
+  }, [navigate, timeframe]); // re-fetch whenever timeframe changes
 
   return { data, loading, error };
 }
+
 
 // ─── Helpers ─────────────────────────────────────────────
 const Skeleton = ({ className = '' }) => (
@@ -297,13 +299,16 @@ function RankingMatrix({ rows, loading }) {
   );
 }
 
-// ─── Main Component ───────────────────────────────────────
+// Maps button index → display label and API query string value
 const TIMEFRAME_OPTIONS = ['Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'This Year'];
+const TIMEFRAME_KEYS = ['7d', '30d', '90d', '1y'];
 
 const Analytics = () => {
-  const { data, loading } = useAnalyticsData();
-  const { kpis, saturation, trends, rankingMatrix, comparison } = data;
   const [timeframeIdx, setTimeframeIdx] = useState(1); // Default: Last 30 Days
+  const timeframe = TIMEFRAME_KEYS[timeframeIdx] ?? '30d';
+
+  const { data, loading } = useAnalyticsData(timeframe);
+  const { kpis, saturation, trends, rankingMatrix, comparison } = data;
 
   const handleExport = () => {
     // Build a district summary from rankingMatrix rows for CSV export
