@@ -48,16 +48,23 @@ router.get('/violation-trends', async (req, res, next) => {
       include: { district: { select: { name: true } } },
     });
 
-    // Group by week
+    // Group by date, inject a human-readable label per data point
     const weekMap = {};
     logs.forEach(log => {
       const weekKey = log.recordedAt.toISOString().split('T')[0];
-      if (!weekMap[weekKey]) weekMap[weekKey] = { date: weekKey, commercial: 0, residential: 0 };
+      if (!weekMap[weekKey]) {
+        // Format: "12 Mei", "03 Jun", etc. using id-ID locale
+        const label = new Intl.DateTimeFormat('id-ID', { day: '2-digit', month: 'short' })
+          .format(new Date(weekKey))
+          .replace('.', ''); // remove trailing dot some locales add (e.g. "Mei.")
+        weekMap[weekKey] = { date: weekKey, label, commercial: 0, residential: 0 };
+      }
       weekMap[weekKey].commercial += log.violationCount;
       weekMap[weekKey].residential += Math.floor(log.violationCount * 0.3);
     });
 
     res.json({ success: true, data: Object.values(weekMap) });
+
   } catch (err) { next(err); }
 });
 

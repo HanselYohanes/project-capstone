@@ -62,12 +62,10 @@ function useAnalyticsData() {
           kpisRes.json(), satRes.json(), trendsRes.json(), matrixRes.json(), compRes.json(),
         ]);
 
+
         // 🗂️ Data mapping — sesuaikan key di sini jika format JSON backend berubah
-        // Override avgCompliance to 85.0 for consistency with the Dashboard view
         const kpisData = kpisJson.data ?? null;
-        if (kpisData?.avgCompliance) {
-          kpisData.avgCompliance = { ...kpisData.avgCompliance, value: 85.0 };
-        }
+
 
         setData({
           kpis: kpisData,
@@ -233,7 +231,7 @@ function TrendChart({ trends, loading }) {
       </div>
       <div className="flex justify-between pl-6 text-[10px] text-on-surface-variant/50">
         {points.map((p, i) => (
-          <span key={i}>Wk {i + 1}</span>
+          <span key={i}>{p.label || `Wk ${i + 1}`}</span>
         ))}
       </div>
     </>
@@ -395,8 +393,8 @@ const Analytics = () => {
                   key={opt}
                   onClick={() => setTimeframeIdx(i)}
                   className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${i === timeframeIdx
-                      ? 'bg-primary/20 text-primary border border-primary/30'
-                      : 'text-on-surface-variant hover:text-white hover:bg-white/5'
+                    ? 'bg-primary/20 text-primary border border-primary/30'
+                    : 'text-on-surface-variant hover:text-white hover:bg-white/5'
                     }`}
                 >
                   {opt}
