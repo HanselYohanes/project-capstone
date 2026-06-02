@@ -69,6 +69,33 @@ router.get('/', async (req, res, next) => {
     const limitNumber = Math.min(Math.max(parseInt(limit), 1), 100);
     const skip = (pageNumber - 1) * limitNumber;
 
+    let trend = undefined;
+    if (type) {
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
+      const currentPeriodCount = await prisma.entity.count({
+        where: {
+          ...where,
+          createdAt: { gte: thirtyDaysAgo }
+        }
+      });
+
+      const previousPeriodCount = await prisma.entity.count({
+        where: {
+          ...where,
+          createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo }
+        }
+      });
+
+      if (previousPeriodCount === 0) {
+        trend = currentPeriodCount > 0 ? 100 : 0;
+      } else {
+        trend = Math.round(((currentPeriodCount - previousPeriodCount) / previousPeriodCount) * 100);
+      }
+    }
+
     const [entities, total] = await Promise.all([
       prisma.entity.findMany({
         where,
@@ -99,6 +126,7 @@ router.get('/', async (req, res, next) => {
         page: pageNumber,
         limit: limitNumber,
         totalPages: Math.ceil(total / limitNumber),
+        ...(trend !== undefined && { trend })
       },
     });
   } catch (err) {

@@ -29,11 +29,13 @@ const getHeaders = () => {
 export const useStats = ({ refreshInterval = 0 } = {}) => {
   const [stats, setStats] = useState({
     pasar:      0,
+    pasarTrend: 0,
     total:      0,
     violations: 0,
     safe:       0,
     compliance: 0,
   });
+
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(null);
 
@@ -73,6 +75,7 @@ export const useStats = ({ refreshInterval = 0 } = {}) => {
       // (versi server-side via meta.total — efisien & akurat)
       const totalMinimarket  = miniJson?.meta?.total  ?? 0;
       const totalPasar       = pasarJson?.meta?.total ?? 0;
+      const pasarTrend       = pasarJson?.meta?.trend ?? 0;
 
       const activeViolations =
         violJson?.data?.totalActive ??
@@ -87,6 +90,7 @@ export const useStats = ({ refreshInterval = 0 } = {}) => {
 
       setStats({
         pasar:      totalPasar,
+        pasarTrend,
         total:      totalMinimarket,
         violations: activeViolations,
         safe:       safeCount,
