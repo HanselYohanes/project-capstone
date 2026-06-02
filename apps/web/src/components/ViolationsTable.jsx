@@ -9,6 +9,8 @@ const ViolationsTable = ({ hideAction = false }) => {
 
   const navigate = useNavigate();
   const { user } = useAuth();
+  
+  const showAction = !hideAction && user?.isAdmin;
 
   const [violations, setViolations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -108,20 +110,20 @@ const ViolationsTable = ({ hideAction = false }) => {
               <th className="px-6 py-4 font-medium">District</th>
               <th className="px-6 py-4 font-medium">Proximity Rule</th>
               <th className="px-6 py-4 font-medium">Status</th>
-              {!hideAction && <th className="px-6 py-4 font-medium text-right">Action</th>}
+              {showAction && <th className="px-6 py-4 font-medium text-right">Action</th>}
             </tr>
           </thead>
 
           <tbody className="text-sm divide-y divide-outline-variant/10">
             {loading ? (
               <tr>
-                <td colSpan={hideAction ? 5 : 6} className="text-center py-8 text-on-surface-variant animate-pulse">
+                <td colSpan={showAction ? 6 : 5} className="text-center py-8 text-on-surface-variant animate-pulse">
                   Menghubungkan ke server retail intelligence...
                 </td>
               </tr>
             ) : violations.length === 0 ? (
               <tr>
-                <td colSpan={hideAction ? 5 : 6} className="text-center py-8 text-on-surface-variant">
+                <td colSpan={showAction ? 6 : 5} className="text-center py-8 text-on-surface-variant">
                   Tidak ada riwayat pelanggaran zonasi yang terdeteksi.
                 </td>
               </tr>
@@ -170,8 +172,8 @@ const ViolationsTable = ({ hideAction = false }) => {
                       </span>
                     </td>
 
-                    {/* ── Action cell (hidden on Dashboard) ── */}
-                    {!hideAction && (
+                    {/* ── Action cell (hidden on Dashboard or for Non-Admins) ── */}
+                    {showAction && (
                       <td className="px-6 py-4 text-right relative">
                         <button
                           onClick={() => toggleDropdown(row.id || displayId)}

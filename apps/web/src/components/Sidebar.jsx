@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 
 // ─── Konstanta ────────────────────────────────────────────────────────────────
 const INITIAL_FORM = {
-  nama:      '',
-  lat:       '',
-  lng:       '',
-  type:      'MINIMARKET',
+  nama: '',
+  lat: '',
+  lng: '',
+  type: 'MINIMARKET',
   kecamatan: '',
   districtId: '',   // diisi otomatis dari dropdown — tidak perlu diketik user
 };
@@ -20,19 +21,20 @@ const INITIAL_FORM = {
  * tanpa perlu prop drilling melalui Layout.
  */
 const Sidebar = () => {
+  const { user } = useAuth();
   const [showAuditModal, setShowAuditModal] = useState(false);
-  const [form,           setForm]           = useState(INITIAL_FORM);
-  const [submitting,     setSubmitting]     = useState(false);
-  const [formError,      setFormError]      = useState('');
+  const [form, setForm] = useState(INITIAL_FORM);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
 
   // Districts untuk dropdown
-  const [districts,        setDistricts]        = useState([]);
+  const [districts, setDistricts] = useState([]);
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const fetchedRef = useRef(false);   // fetch sekali saja sepanjang sesi
 
-  const baseLinkClass    = "flex items-center gap-3 px-6 py-4 transition-all duration-300 scale-95 duration-150 ease-in-out ";
+  const baseLinkClass = "flex items-center gap-3 px-6 py-4 transition-all duration-300 scale-95 duration-150 ease-in-out ";
   const inactiveLinkClass = baseLinkClass + "text-slate-400 hover:bg-white/5 hover:text-white";
-  const activeLinkClass   = baseLinkClass + "text-[#7C3AED] bg-gradient-to-r from-[#7C3AED]/10 to-transparent border-r-4 border-[#7C3AED]";
+  const activeLinkClass = baseLinkClass + "text-[#7C3AED] bg-gradient-to-r from-[#7C3AED]/10 to-transparent border-r-4 border-[#7C3AED]";
 
   // ── Fetch daftar districts saat modal pertama kali dibuka ─────────────────
   useEffect(() => {
@@ -96,14 +98,14 @@ const Sidebar = () => {
       // POST ke backend — menggunakan Axios instance (otomatis bawa JWT token)
       // Backend: prisma.$transaction → simpan ke Audit + Entity sekaligus
       await api.post('/audits', {
-        name:       form.nama.trim(),
-        type:       form.type,
-        latitude:   parseFloat(form.lat),
-        longitude:  parseFloat(form.lng),
-        kelurahan:  form.kecamatan.trim() || undefined,
+        name: form.nama.trim(),
+        type: form.type,
+        latitude: parseFloat(form.lat),
+        longitude: parseFloat(form.lng),
+        kelurahan: form.kecamatan.trim() || undefined,
         districtId: form.districtId,    // UUID dari state — tidak perlu diketik user
-        priority:   'MEDIUM',
-        status:     'PENDING',
+        priority: 'MEDIUM',
+        status: 'PENDING',
       });
 
       // Tutup modal dan reset form
@@ -115,7 +117,7 @@ const Sidebar = () => {
     } catch (err) {
       const msg =
         err?.response?.data?.message ||
-        err?.response?.data?.error   ||
+        err?.response?.data?.error ||
         err.message ||
         'Gagal menyimpan data. Coba lagi.';
       setFormError(msg);
@@ -166,10 +168,12 @@ const Sidebar = () => {
             <span className="font-medium text-sm">Violations</span>
           </NavLink>
 
-          <NavLink to="/audit-logs" className={({ isActive }) => isActive ? activeLinkClass : inactiveLinkClass}>
-            <span className="material-symbols-outlined">assignment</span>
-            <span className="font-medium text-sm">Audit Logs</span>
-          </NavLink>
+          {user?.isAdmin && (
+            <NavLink to="/audit-logs" className={({ isActive }) => isActive ? activeLinkClass : inactiveLinkClass}>
+              <span className="material-symbols-outlined">assignment</span>
+              <span className="font-medium text-sm">Audit Logs</span>
+            </NavLink>
+          )}
 
           <NavLink to="/calculator" className={({ isActive }) => isActive ? activeLinkClass : inactiveLinkClass}>
             <span className="material-symbols-outlined">calculate</span>
@@ -178,16 +182,18 @@ const Sidebar = () => {
         </div>
 
         {/* CTA — New Audit */}
-        <div className="p-6 mt-auto">
-          <button
-            id="new-audit-btn"
-            onClick={() => setShowAuditModal(true)}
-            className="w-full py-3 px-4 bg-gradient-to-r from-primary-container to-[#5a00c6] text-white font-bold text-xs tracking-widest uppercase rounded-lg shadow-[0_0_20px_rgba(124,58,237,0.3)] hover:shadow-[0_0_30px_rgba(124,58,237,0.5)] transition-all duration-300 flex items-center justify-center gap-2"
-          >
-            <span className="material-symbols-outlined text-sm">add_circle</span>
-            New Audit
-          </button>
-        </div>
+        {user?.isAdmin && (
+          <div className="p-6 mt-auto">
+            <button
+              id="new-audit-btn"
+              onClick={() => setShowAuditModal(true)}
+              className="w-full py-3 px-4 bg-gradient-to-r from-primary-container to-[#5a00c6] text-white font-bold text-xs tracking-widest uppercase rounded-lg shadow-[0_0_20px_rgba(124,58,237,0.3)] hover:shadow-[0_0_30px_rgba(124,58,237,0.5)] transition-all duration-300 flex items-center justify-center gap-2"
+            >
+              <span className="material-symbols-outlined text-sm">add_circle</span>
+              New Audit
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* ── Modal New Audit ─────────────────────────────────────────────────── */}
