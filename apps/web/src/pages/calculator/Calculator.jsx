@@ -118,6 +118,12 @@ const Calculator = () => {
   const isViolation = results?.result?.isViolation;
   const nearestMarkets = results?.allMarkets || [];
 
+  // Jumlah retail kompetitor dalam 500m — dari generatedFeatures yang diisi oleh /ai/predict
+  const retailCount =
+    results?.generatedFeatures?.competitor_density ??
+    prediction?.competitor_density ??
+    null;
+
   // Data prediksi AI dari ML API
   // Data prediksi AI dari ML API
   const prediction = results?.prediction;
@@ -449,6 +455,17 @@ const Calculator = () => {
                     </p>
                     <p className="text-xs text-green-300/70 mt-0.5">Lokasi ini memenuhi persyaratan zonasi minimarket</p>
                   </div>
+                </div>
+
+                {/* 🏪 Retail count chip — only visible in Aman state */}
+                <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-lg bg-black/20 border border-green-500/15 w-fit">
+                  <span className="text-base leading-none">🏪</span>
+                  <span className="text-sm text-on-surface-variant">
+                    Jumlah Retail dalam radius 500m:{' '}
+                    <span className="font-bold text-green-300">
+                      {retailCount !== null ? `${retailCount} toko` : '— toko'}
+                    </span>
+                  </span>
                 </div>
 
                 {/* Confidence */}
