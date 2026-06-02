@@ -49,6 +49,8 @@ const Calculator = () => {
       setLoading(true);
       setError('');
       setResults(null);
+      setAiRec(null);        // clear previous AI recommendation card immediately
+      setIsAiLoading(false); // reset any stuck loading spinner from a prior request
 
       // Jalankan kedua request secara paralel agar lebih cepat.
       // Promise.allSettled memastikan jika salah satu gagal, yang lain tetap diproses.
