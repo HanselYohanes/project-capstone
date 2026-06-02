@@ -17,18 +17,27 @@ export const RequireAuth = () => {
   return <Outlet />;
 };
 
-export const RequireAdmin = () => {
+export const RequireAdmin = ({ children }) => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <div className="p-8 text-center text-white">Loading...</div>;
+    // Full-screen loader so it never appears as a blank page
+    return (
+      <div className="ml-64 flex items-center justify-center min-h-screen bg-surface-dim">
+        <div className="flex flex-col items-center gap-3 text-on-surface-variant">
+          <span className="material-symbols-outlined animate-spin text-4xl text-primary">refresh</span>
+          <p className="text-sm">Memverifikasi akses admin…</p>
+        </div>
+      </div>
+    );
   }
 
   if (!user || !user.isAdmin) {
     return <Navigate to="/" replace />;
   }
 
-  return <Outlet />;
+  // Support both wrapper-children pattern and nested-route Outlet pattern
+  return children ? <>{children}</> : <Outlet />;
 };
 
 const ProtectedRoute = ({ children }) => {

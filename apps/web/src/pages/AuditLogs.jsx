@@ -4,16 +4,16 @@ import api from '../utils/api';
 
 // ─── Badge helpers ────────────────────────────────────────────────────────────
 const STATUS_STYLE = {
-  PENDING:     'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30',
+  PENDING: 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30',
   IN_PROGRESS: 'bg-blue-500/15   text-blue-400   border border-blue-500/30',
-  COMPLETED:   'bg-green-500/15  text-green-400  border border-green-500/30',
-  CANCELLED:   'bg-red-500/15    text-red-400    border border-red-500/30',
+  COMPLETED: 'bg-green-500/15  text-green-400  border border-green-500/30',
+  CANCELLED: 'bg-red-500/15    text-red-400    border border-red-500/30',
 };
 
 const PRIORITY_STYLE = {
-  HIGH:   'bg-red-500/15    text-red-400',
+  HIGH: 'bg-red-500/15    text-red-400',
   MEDIUM: 'bg-yellow-500/15 text-yellow-400',
-  LOW:    'bg-green-500/15  text-green-400',
+  LOW: 'bg-green-500/15  text-green-400',
 };
 
 const StatusBadge = ({ status }) => (
@@ -67,40 +67,60 @@ const ConfirmDialog = ({ message, onConfirm, onCancel }) => (
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const AuditLogs = () => {
-  const [audits,     setAudits]     = useState([]);
+  const [audits, setAudits] = useState([]);
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
-  const [loading,    setLoading]    = useState(true);
-  const [error,      setError]      = useState(null);
-  const [actionMsg,  setActionMsg]  = useState('');  // feedback singkat setelah aksi
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [actionMsg, setActionMsg] = useState('');  // feedback singkat setelah aksi
 
   // Filter state
   const [filters, setFilters] = useState({ status: '', priority: '', search: '' });
-  const [page,    setPage]    = useState(1);
+  const [page, setPage] = useState(1);
 
   // Confirm dialog state
   const [confirm, setConfirm] = useState(null);  // { type: 'delete'|'restore', id, code }
 
   // ── Fetch data ────────────────────────────────────────────────────────────
   const fetchAudits = useCallback(async (currentPage = 1, currentFilters = filters) => {
+    console.log('[AuditLogs] fetchAudits called — page:', currentPage, 'filters:', currentFilters);
     try {
       setLoading(true);
       setError(null);
 
       const params = new URLSearchParams({
-        page:      currentPage,
-        limit:     10,
-        sortBy:    'createdAt',
+        page: currentPage,
+        limit: 10,
+        sortBy: 'createdAt',
         sortOrder: 'desc',
       });
-      if (currentFilters.status)   params.set('status',   currentFilters.status);
+      if (currentFilters.status) params.set('status', currentFilters.status);
       if (currentFilters.priority) params.set('priority', currentFilters.priority);
-      if (currentFilters.search)   params.set('search',   currentFilters.search);
+      if (currentFilters.search) params.set('search', currentFilters.search);
 
-      const res = await api.get(`/audits?${params.toString()}`);
-      setAudits(res.data.data ?? []);
+      const endpoint = `/audits?${params.toString()}`;
+      console.log('[AuditLogs] GET', endpoint);
+
+      const res = await api.get(endpoint);
+      console.log('[AuditLogs] raw response:', res.data);
+
+      // Flexible response shape: plain array OR { data: [...], pagination: {} }
+      const rows = Array.isArray(res.data)
+        ? res.data
+        : Array.isArray(res.data?.data)
+          ? res.data.data
+          : [];
+
+      console.log('[AuditLogs] rows parsed:', rows.length, 'items');
+      setAudits(rows);
       setPagination(res.data.pagination ?? { page: 1, totalPages: 1, total: 0 });
     } catch (err) {
-      setError(err?.response?.data?.message ?? err.message ?? 'Gagal memuat data');
+      console.error('[AuditLogs] fetchAudits ERROR:', err);
+      const msg =
+        err?.response?.data?.message ??
+        err?.response?.data?.error ??
+        err.message ??
+        'Gagal memuat data audit';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -149,6 +169,8 @@ const AuditLogs = () => {
 
   const formatDate = (d) =>
     d ? new Date(d).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+  console.log('[AuditLogs] render — loading:', loading, '| error:', error, '| audits:', audits.length);
 
   return (
     <div className="bg-surface-dim text-on-surface font-body antialiased min-h-screen">
@@ -251,9 +273,16 @@ const AuditLogs = () => {
                   </tr>
                 ) : audits.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-on-surface-variant text-xs">
-                      <span className="material-symbols-outlined text-2xl block mb-1 opacity-40">inbox</span>
-                      Tidak ada data audit
+                    <td colSpan={7} className="px-4 py-10 text-center text-xs">
+                      {/* ── DEBUG BANNER ── Remove once data is confirmed ── */}
+                      <div className="mb-3 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-mono">
+                        <span className="material-symbols-outlined text-sm">bug_report</span>
+                        DEBUG: No data found — API returned 0 rows. Check console for raw response.
+                      </div>
+                      <div className="text-on-surface-variant mt-2">
+                        <span className="material-symbols-outlined text-2xl block mb-1 opacity-40">inbox</span>
+                        Tidak ada data audit
+                      </div>
                     </td>
                   </tr>
                 ) : (
