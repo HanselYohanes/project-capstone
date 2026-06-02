@@ -504,97 +504,98 @@ const Calculator = () => {
 
                 {/* AI Recommendation Result Card + error — auto-fetched, only shown for violations */}
                 {isAiViolation && (
-                  { aiRec && !aiRec.error && (
-                    <div className="rounded-xl border border-violet-500/25 bg-violet-950/20 p-5 flex flex-col gap-4 animate-[fadeIn_0.4s_ease]">
-                      <div className="flex items-center gap-2">
-                        <span className="material-symbols-outlined text-violet-400 text-lg">location_on</span>
-                        <span className="text-xs font-bold text-violet-300 uppercase tracking-widest">Rekomendasi Lokasi</span>
-                      </div>
-
-                      {/* Zone status + retail count */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-black/20 rounded-lg px-4 py-2.5">
-                          <p className="text-[10px] text-on-surface-variant uppercase tracking-wider mb-0.5">Status Zona</p>
-                          <p className={`text-sm font-bold ${aiRec.zoneStatus === 'Aman' ? 'text-green-400' :
-                            aiRec.zoneStatus === 'Melanggar' ? 'text-red-400' : 'text-yellow-400'
-                            }`}>{aiRec.zoneStatus}</p>
+                  <>
+                    {aiRec && !aiRec.error && (
+                      <div className="rounded-xl border border-violet-500/25 bg-violet-950/20 p-5 flex flex-col gap-4 animate-[fadeIn_0.4s_ease]">
+                        <div className="flex items-center gap-2">
+                          <span className="material-symbols-outlined text-violet-400 text-lg">location_on</span>
+                          <span className="text-xs font-bold text-violet-300 uppercase tracking-widest">Rekomendasi Lokasi</span>
                         </div>
-                        <div className="bg-black/20 rounded-lg px-4 py-2.5">
-                          <p className="text-[10px] text-on-surface-variant uppercase tracking-wider mb-0.5">Retail dalam 500m</p>
-                          <p className="text-sm font-bold text-white">{aiRec.retailCountWithin500m ?? '-'}</p>
-                        </div>
-                      </div>
 
-                      {/* Alternative coordinates */}
-                      {aiRec.alternative ? (
-                        <div className="bg-violet-900/20 rounded-xl border border-violet-500/20 p-4 flex flex-col gap-2">
-                          <p className="text-xs font-semibold text-violet-300 uppercase tracking-wider">Koordinat Alternatif Terdekat</p>
-                          <div className="flex items-baseline gap-2">
-                            <span className="material-symbols-outlined text-violet-400 text-sm">explore</span>
-                            <span className="text-sm font-mono text-white">
-                              {aiRec.alternative.lat}, {aiRec.alternative.lng}
-                            </span>
+                        {/* Zone status + retail count */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-black/20 rounded-lg px-4 py-2.5">
+                            <p className="text-[10px] text-on-surface-variant uppercase tracking-wider mb-0.5">Status Zona</p>
+                            <p className={`text-sm font-bold ${aiRec.zoneStatus === 'Aman' ? 'text-green-400' :
+                              aiRec.zoneStatus === 'Melanggar' ? 'text-red-400' : 'text-yellow-400'
+                              }`}>{aiRec.zoneStatus}</p>
                           </div>
-                          <p className="text-xs text-violet-200/70">
-                            Bergeser <span className="font-semibold text-violet-300">{aiRec.alternative.distanceM}m</span> ke arah{' '}
-                            <span className="font-semibold text-violet-300">{aiRec.alternative.direction}</span>
-                          </p>
+                          <div className="bg-black/20 rounded-lg px-4 py-2.5">
+                            <p className="text-[10px] text-on-surface-variant uppercase tracking-wider mb-0.5">Retail dalam 500m</p>
+                            <p className="text-sm font-bold text-white">{aiRec.retailCountWithin500m ?? '-'}</p>
+                          </div>
                         </div>
-                      ) : (
-                        <p className="text-xs text-on-surface-variant italic">Tidak ditemukan titik alternatif dalam radius pencarian.</p>
-                      )}
 
-                      {/* AI natural-language explanation */}
-                      <div className="rounded-lg bg-black/20 border border-violet-500/10 p-4">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="material-symbols-outlined text-sm text-violet-400">smart_toy</span>
-                          <span className="text-xs font-semibold text-violet-400 uppercase tracking-wider">Analisis</span>
+                        {/* Alternative coordinates */}
+                        {aiRec.alternative ? (
+                          <div className="bg-violet-900/20 rounded-xl border border-violet-500/20 p-4 flex flex-col gap-2">
+                            <p className="text-xs font-semibold text-violet-300 uppercase tracking-wider">Koordinat Alternatif Terdekat</p>
+                            <div className="flex items-baseline gap-2">
+                              <span className="material-symbols-outlined text-violet-400 text-sm">explore</span>
+                              <span className="text-sm font-mono text-white">
+                                {aiRec.alternative.lat}, {aiRec.alternative.lng}
+                              </span>
+                            </div>
+                            <p className="text-xs text-violet-200/70">
+                              Bergeser <span className="font-semibold text-violet-300">{aiRec.alternative.distanceM}m</span> ke arah{' '}
+                              <span className="font-semibold text-violet-300">{aiRec.alternative.direction}</span>
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-on-surface-variant italic">Tidak ditemukan titik alternatif dalam radius pencarian.</p>
+                        )}
+
+                        {/* AI natural-language explanation */}
+                        <div className="rounded-lg bg-black/20 border border-violet-500/10 p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="material-symbols-outlined text-sm text-violet-400">smart_toy</span>
+                            <span className="text-xs font-semibold text-violet-400 uppercase tracking-wider">Analisis</span>
+                          </div>
+                          <p className="text-sm text-violet-100/80 leading-relaxed">{aiRec.explanation}</p>
                         </div>
-                        <p className="text-sm text-violet-100/80 leading-relaxed">{aiRec.explanation}</p>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                {/* Error state */}
-                {aiRec?.error && (
-                  <div className="rounded-xl bg-red-900/15 border border-red-500/20 p-4 text-sm text-red-300">
-                    <span className="material-symbols-outlined text-sm mr-1 align-middle">error_outline</span>
-                    {aiRec.error}
-                  </div>
+                    {/* Error state */}
+                    {aiRec?.error && (
+                      <div className="rounded-xl bg-red-900/15 border border-red-500/20 p-4 text-sm text-red-300">
+                        <span className="material-symbols-outlined text-sm mr-1 align-middle">error_outline</span>
+                        {aiRec.error}
+                      </div>
+                    )}
+                  </>
                 )}
-              </>
+              </div>
             )}
           </div>
-            )}
         </div>
-    </div>
 
-        {/* ── Result Cards (Haversine distance summary + markets table) ── */ }
-  {
-    results && nearest && (
-      <div className="flex flex-col gap-6 animate-[fadeIn_0.3s_ease]">
-        <div className={`rounded-xl p-6 border ${isViolation ? 'bg-red-900/20 border-red-500/40' : 'bg-green-900/20 border-green-500/40'}`}>
-          <h3 className="text-xl font-bold text-white mb-2">{results.input?.name}</h3>
-          <p className="text-sm text-on-surface-variant">{results.result?.message}</p>
-        </div>
-        {/* Tabel Pasar Tradisional */}
-        <div className="glass-panel rounded-xl p-6 border border-slate-700/30">
-          <table className="w-full text-left">
-            <thead><tr className="text-xs uppercase text-on-surface-variant"><th>Pasar</th><th>Jarak</th><th>Status</th></tr></thead>
-            <tbody className="divide-y divide-outline-variant/10">
-              {nearestMarkets.map((pasar, idx) => (
-                <tr key={idx}>
-                  <td className="py-3">{pasar.pasarName}</td>
-                  <td className="py-3">{Number(pasar.distanceMeters).toLocaleString()} m</td>
-                  <td className="py-3">{pasar.status}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    )
-  }
+        {/* ── Result Cards (Haversine distance summary + markets table) ── */}
+        {
+          results && nearest && (
+            <div className="flex flex-col gap-6 animate-[fadeIn_0.3s_ease]">
+              <div className={`rounded-xl p-6 border ${isViolation ? 'bg-red-900/20 border-red-500/40' : 'bg-green-900/20 border-green-500/40'}`}>
+                <h3 className="text-xl font-bold text-white mb-2">{results.input?.name}</h3>
+                <p className="text-sm text-on-surface-variant">{results.result?.message}</p>
+              </div>
+              {/* Tabel Pasar Tradisional */}
+              <div className="glass-panel rounded-xl p-6 border border-slate-700/30">
+                <table className="w-full text-left">
+                  <thead><tr className="text-xs uppercase text-on-surface-variant"><th>Pasar</th><th>Jarak</th><th>Status</th></tr></thead>
+                  <tbody className="divide-y divide-outline-variant/10">
+                    {nearestMarkets.map((pasar, idx) => (
+                      <tr key={idx}>
+                        <td className="py-3">{pasar.pasarName}</td>
+                        <td className="py-3">{Number(pasar.distanceMeters).toLocaleString()} m</td>
+                        <td className="py-3">{pasar.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
+        }
       </main >
     </div >
   );
