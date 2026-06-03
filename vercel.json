@@ -1,5 +1,7 @@
 {
   "version": 2,
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "npm run build",
   "builds": [
     {
       "src": "api/handler.js",
@@ -9,7 +11,7 @@
       "src": "apps/web/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "buildCommand": "npm run build",
+        "buildCommand": "npm run build --legacy-peer-deps",
         "outputDirectory": "dist"
       }
     }
