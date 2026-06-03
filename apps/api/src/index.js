@@ -27,8 +27,12 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(
   cors({
     origin: process.env.NODE_ENV === 'production' 
-      ? [process.env.VITE_API_BASE_URL || '', process.env.FRONTEND_URL || '']
-      : ['http://localhost:5173', 'http://localhost:5174'],
+      ? [
+          'https://zonify.vercel.app',
+          process.env.VITE_API_BASE_URL || '',
+          process.env.FRONTEND_URL || ''
+        ].filter(Boolean)
+      : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3001'],
     credentials: true,
   })
 );

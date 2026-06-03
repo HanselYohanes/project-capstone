@@ -1,17 +1,19 @@
 {
   "version": 2,
   "installCommand": "npm install --legacy-peer-deps",
-  "buildCommand": "npm run build",
   "builds": [
     {
-      "src": "api/handler.js",
-      "use": "@vercel/node"
+      "src": "apps/api/src/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "zeroConfig": true
+      }
     },
     {
       "src": "apps/web/package.json",
       "use": "@vercel/static-build",
       "config": {
-        "buildCommand": "npm run build --legacy-peer-deps",
+        "buildCommand": "npm run build",
         "outputDirectory": "dist"
       }
     }
@@ -19,7 +21,11 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "api/handler.js"
+      "dest": "apps/api/src/index.js"
+    },
+    {
+      "src": "/(?!api)",
+      "dest": "apps/web/dist/index.html"
     },
     {
       "src": "/(.*)",
@@ -29,13 +35,16 @@
   "env": {
     "DATABASE_URL": "@DATABASE_URL",
     "DIRECT_URL": "@DIRECT_URL",
+    "NODE_ENV": "@NODE_ENV",
+    "PORT": "@PORT",
     "JWT_SECRET": "@JWT_SECRET",
     "ADMIN_SECRET": "@ADMIN_SECRET",
     "VITE_API_BASE_URL": "@VITE_API_BASE_URL",
+    "VITE_API_URL": "@VITE_API_URL",
     "AI_SERVICE_URL": "@AI_SERVICE_URL"
   },
   "functions": {
-    "api/handler.js": {
+    "apps/api/src/index.js": {
       "maxDuration": 30,
       "memory": 1024
     }
