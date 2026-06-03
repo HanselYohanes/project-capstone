@@ -12,14 +12,5 @@
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/handler.js" },
     { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "env": {
-    "DATABASE_URL": "@DATABASE_URL",
-    "DIRECT_URL": "@DIRECT_URL",
-    "NODE_ENV": "@NODE_ENV",
-    "PORT": "@PORT",
-    "JWT_SECRET": "@JWT_SECRET",
-    "ADMIN_SECRET": "@ADMIN_SECRET",
-    "AI_SERVICE_URL": "@AI_SERVICE_URL"
-  }
+  ]
 }
