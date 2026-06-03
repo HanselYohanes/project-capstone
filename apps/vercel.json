@@ -3,17 +3,17 @@
   "installCommand": "npm install --legacy-peer-deps",
   "experimentalServices": {
     "web": {
-      "root": "apps/web",
+      "root": "web",
       "routePrefix": "/",
       "framework": "vite",
-      "buildCommand": "npm run build --workspace=apps/web"
+      "buildCommand": "npm run build"
     },
     "api": {
-      "root": "apps/api",
+      "root": "api",
       "routePrefix": "/api",
       "framework": "express",
       "entrypoint": "src/index.js",
-      "buildCommand": "npm run build --workspace=apps/api || true"
+      "buildCommand": "npm run build || true"
     }
   },
   "env": {
@@ -28,7 +28,7 @@
     "AI_SERVICE_URL": "@AI_SERVICE_URL"
   },
   "functions": {
-    "apps/api/src/index.js": {
+    "api/src/index.js": {
       "maxDuration": 30,
       "memory": 1024
     }
