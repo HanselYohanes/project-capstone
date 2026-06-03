@@ -1,6 +1,7 @@
 {
   "version": 2,
   "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "npm run build",
   "builds": [
     {
       "src": "apps/api/src/index.js",
@@ -10,11 +11,11 @@
       }
     },
     {
-      "src": "apps/web/package.json",
+      "src": "apps/web",
       "use": "@vercel/static-build",
       "config": {
-        "buildCommand": "npm run build",
-        "outputDirectory": "dist"
+        "buildCommand": "npm run build --workspace=apps/web",
+        "outputDirectory": "apps/web/dist"
       }
     }
   ],
