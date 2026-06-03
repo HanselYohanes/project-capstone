@@ -15,6 +15,7 @@ function parseCSVLine(line) {
   return result;
 }
 
+
 const lines = text.split('\n').filter(l => l.trim());
 const header = parseCSVLine(lines[0]);
 console.log('Columns:', header);
