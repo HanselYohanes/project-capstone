@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch src/index.js",
+    "build": "echo 'API build complete'",
     "start": "node src/index.js",
     "db:migrate": "npx prisma migrate dev",
     "db:seed": "node prisma/seed.js",
