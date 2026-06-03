@@ -1,38 +1,19 @@
 {
   "version": 2,
   "installCommand": "npm install --legacy-peer-deps",
-  "buildCommand": "npm run build",
-  "builds": [
-    {
-      "src": "apps/api/src/index.js",
-      "use": "@vercel/node",
-      "config": {
-        "zeroConfig": true
-      }
+  "experimentalServices": {
+    "web": {
+      "root": "apps/web",
+      "routePrefix": "/",
+      "framework": "vite"
     },
-    {
-      "src": "apps/web",
-      "use": "@vercel/static-build",
-      "config": {
-        "buildCommand": "npm run build --workspace=apps/web",
-        "outputDirectory": "apps/web/dist"
-      }
+    "api": {
+      "root": "apps/api",
+      "routePrefix": "/api",
+      "framework": "express",
+      "entrypoint": "src/index.js"
     }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "apps/api/src/index.js"
-    },
-    {
-      "src": "/(?!api)",
-      "dest": "apps/web/dist/index.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "apps/web/dist/$1"
-    }
-  ],
+  },
   "env": {
     "DATABASE_URL": "@DATABASE_URL",
     "DIRECT_URL": "@DIRECT_URL",
