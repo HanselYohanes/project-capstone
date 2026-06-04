@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 
 // 🔧 Sesuaikan API_BASE dengan env kamu
-const API_BASE = "http://localhost:3001/api/v1";
+const API_BASE = `${import.meta.env.VITE_API_URL ?? "http://localhost:3001"}/api/v1`;
 
 export const useLocations = () => {
     const [locations, setLocations] = useState([]);
