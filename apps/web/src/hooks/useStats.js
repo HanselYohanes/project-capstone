@@ -1,20 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-
-const API_BASE = `${import.meta.env.VITE_API_URL ?? "http://localhost:3001"}/api/v1`;
-
-// Helper ambil Authorization header dari localStorage
-const getHeaders = () => {
-  try {
-    const token =
-      localStorage.getItem("token") ||
-      JSON.parse(localStorage.getItem("user") ?? "{}")?.token;
-    return token
-      ? { "Content-Type": "application/json", Authorization: `Bearer ${token}` }
-      : { "Content-Type": "application/json" };
-  } catch {
-    return { "Content-Type": "application/json" };
-  }
-};
+import api from '../utils/api';
 
 /**
  * useStats — Single Source of Truth untuk KPI Dashboard.
@@ -28,54 +13,38 @@ const getHeaders = () => {
  */
 export const useStats = ({ refreshInterval = 0 } = {}) => {
   const [stats, setStats] = useState({
-    pasar:      0,
+    pasar: 0,
     pasarTrend: 0,
-    total:      0,
+    total: 0,
     violations: 0,
-    safe:       0,
+    safe: 0,
     compliance: 0,
   });
 
   const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
+  const [error, setError] = useState(null);
 
   const fetchLiveStats = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const headers = getHeaders();
-
-      // ── Fetch paralel dengan cache: 'no-store' agar tidak kena 304 ──────────
+      // ── Fetch paralel dengan Cache-Control: 'no-store' agar tidak kena 304 ──
       const [miniRes, pasarRes, violRes] = await Promise.all([
-        fetch(`${API_BASE}/entities?type=MINIMARKET&limit=1`, {
-          headers,
-          cache: 'no-store',   // ← paksa browser tidak gunakan cache
-        }),
-        fetch(`${API_BASE}/entities?type=PASAR&limit=1`, {
-          headers,
-          cache: 'no-store',
-        }),
-        fetch(`${API_BASE}/violations/summary`, {
-          headers,
-          cache: 'no-store',
-        }),
+        api.get('/entities?type=MINIMARKET&limit=1', { headers: { 'Cache-Control': 'no-store' } }),
+        api.get('/entities?type=PASAR&limit=1', { headers: { 'Cache-Control': 'no-store' } }),
+        api.get('/violations/summary', { headers: { 'Cache-Control': 'no-store' } }).catch(() => null),
       ]);
 
-      if (!miniRes.ok)  throw new Error(`Entities MINIMARKET error: ${miniRes.status}`);
-      if (!pasarRes.ok) throw new Error(`Entities PASAR error: ${pasarRes.status}`);
-
-      const [miniJson, pasarJson, violJson] = await Promise.all([
-        miniRes.json(),
-        pasarRes.json(),
-        violRes.ok ? violRes.json() : Promise.resolve(null),
-      ]);
+      const miniJson = miniRes.data;
+      const pasarJson = pasarRes.data;
+      const violJson = violRes ? violRes.data : null;
 
       // totalMinimarket = entities.filter(e => e.type === 'MINIMARKET').length
       // (versi server-side via meta.total — efisien & akurat)
-      const totalMinimarket  = miniJson?.meta?.total  ?? 0;
-      const totalPasar       = pasarJson?.meta?.total ?? 0;
-      const pasarTrend       = pasarJson?.meta?.trend ?? 0;
+      const totalMinimarket = miniJson?.meta?.total ?? 0;
+      const totalPasar = pasarJson?.meta?.total ?? 0;
+      const pasarTrend = pasarJson?.meta?.trend ?? 0;
 
       const activeViolations =
         violJson?.data?.totalActive ??
@@ -89,11 +58,11 @@ export const useStats = ({ refreshInterval = 0 } = {}) => {
           : "0.0";
 
       setStats({
-        pasar:      totalPasar,
+        pasar: totalPasar,
         pasarTrend,
-        total:      totalMinimarket,
+        total: totalMinimarket,
         violations: activeViolations,
-        safe:       safeCount,
+        safe: safeCount,
         compliance,
       });
     } catch (err) {

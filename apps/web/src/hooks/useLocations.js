@@ -1,7 +1,5 @@
 import { useState, useEffect } from 'react';
-
-// 🔧 Sesuaikan API_BASE dengan env kamu
-const API_BASE = "http://localhost:3001/api/v1";
+import api from '../utils/api';
 
 export const useLocations = () => {
     const [locations, setLocations] = useState([]);
@@ -9,17 +7,9 @@ export const useLocations = () => {
     useEffect(() => {
         const fetchPoints = async () => {
             try {
-                const savedUser = localStorage.getItem("user");
-                const token = savedUser ? JSON.parse(savedUser)?.token : null;
+                const response = await api.get('/zoning/points');
 
-                const response = await fetch(`${API_BASE}/zoning/points`, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-
-                const json = await response.json();
+                const json = response.data;
 
                 if (json.success && json.data) {
                     // Kita pakai logika mapping dari kodingan lama agar data "nyambung" ke Peta
