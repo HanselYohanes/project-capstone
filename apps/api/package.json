@@ -10,8 +10,7 @@
     "db:migrate": "npx prisma migrate dev",
     "db:seed": "node prisma/seed.js",
     "db:reset": "npx prisma migrate reset --force",
-    "migrate": "npm run db:migrate",
-    "postinstall": "prisma generate"
+    "migrate": "npm run db:migrate"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
