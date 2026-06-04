@@ -24,9 +24,31 @@ const PORT = process.env.PORT || 3001;
 // ─── Middleware ──────────────────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: false }));
 
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:5174',
+  // Extra origins from env (comma-separated), e.g. your custom production domain
+  ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()) : []),
+];
+
 app.use(
   cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    origin: (origin, callback) => {
+      // Allow requests with no origin (server-to-server, curl, Postman, etc.)
+      if (!origin) return callback(null, true);
+
+      // Allow any *.vercel.app subdomain (preview deployments + production)
+      if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow explicitly listed origins
+      if (ALLOWED_ORIGINS.includes(origin)) {
+        return callback(null, true);
+      }
+
+      callback(new Error(`CORS: origin '${origin}' not allowed`));
+    },
     credentials: true,
   })
 );
