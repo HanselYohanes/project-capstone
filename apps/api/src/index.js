@@ -31,27 +31,32 @@ const ALLOWED_ORIGINS = [
   ...(process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim()) : []),
 ];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (server-to-server, curl, Postman, etc.)
-      if (!origin) return callback(null, true);
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (server-to-server, curl, Postman, etc.)
+    if (!origin) return callback(null, true);
 
-      // Allow any *.vercel.app subdomain (preview deployments + production)
-      if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/.test(origin)) {
-        return callback(null, true);
-      }
+    // Allow any *.vercel.app subdomain — case-insensitive, single-level only
+    if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) {
+      return callback(null, true);
+    }
 
-      // Allow explicitly listed origins
-      if (ALLOWED_ORIGINS.includes(origin)) {
-        return callback(null, true);
-      }
+    // Allow explicitly listed origins
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      return callback(null, true);
+    }
 
-      callback(new Error(`CORS: origin '${origin}' not allowed`));
-    },
-    credentials: true,
-  })
-);
+    // Reject — use false (not an Error) so Express doesn't swallow CORS headers
+    return callback(null, false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+
+// Handle OPTIONS preflight for all routes explicitly
+app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
 
 app.use(express.json());
 app.use(morgan('dev'));
