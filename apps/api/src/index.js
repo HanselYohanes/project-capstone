@@ -109,11 +109,18 @@ app.use((err, req, res, next) => {
 });
 
 // ─── Start Server ───────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n Zonify API running at http://localhost:${PORT}`);
-  console.log(` API Base: http://localhost:${PORT}/api/v1`);
-  console.log(` Health:   http://localhost:${PORT}/api/v1/health`);
-  console.log(` Auth:     http://localhost:${PORT}/api/v1/auth`);
-  console.log(` AI:       http://localhost:${PORT}/api/v1/ai`);
-  console.log(` Test:     http://localhost:${PORT}/api/v1/test\n`);
-});
+// In production on Vercel, the serverless runtime handles requests.
+// app.listen() is only needed for local development.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`\n Zonify API running at http://localhost:${PORT}`);
+    console.log(` API Base: http://localhost:${PORT}/api/v1`);
+    console.log(` Health:   http://localhost:${PORT}/api/v1/health`);
+    console.log(` Auth:     http://localhost:${PORT}/api/v1/auth`);
+    console.log(` AI:       http://localhost:${PORT}/api/v1/ai`);
+    console.log(` Test:     http://localhost:${PORT}/api/v1/test\n`);
+  });
+}
+
+// Export for Vercel serverless (@vercel/node wraps this Express app)
+export default app;
