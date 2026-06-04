@@ -1,29 +1,33 @@
-import api from '../utils/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1';
 
-/**
- * Mengambil semua titik data peta zonasi dari backend.
- * GET /api/v1/zoning/points
- * @returns {Promise<Array>} Array of zoning map point objects.
- */
 export const getZoningMapPoints = async () => {
-  const response = await api.get('/zoning/points');
-  // response.data = { success, message, data: [...] }
-  return response.data.data;
+  const token = localStorage.getItem('token'); // Tambahkan token juga di sini
+  const response = await fetch(`${API_BASE_URL}/zoning/points`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+
+  const json = await response.json();
+  if (!response.ok) throw new Error(json.message || 'Gagal mengambil data peta');
+  return json.data;
 };
 
-/**
- * Menghitung status zonasi berdasarkan koordinat dan radius.
- * POST /api/v1/zoning/calculate
- * @param {Object} payload - { name, latitude, longitude, radiusMeters }
- * @returns {Promise<Object>} Keseluruhan objek { success, message, data } dari backend.
- */
 export const calculateZoning = async (payload) => {
-  const response = await api.post('/zoning/calculate', payload);
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_BASE_URL}/zoning/calculate`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}` // PENTING: Agar lolos middleware authenticate
+    },
+    body: JSON.stringify(payload)
+  });
 
-  // response.data = { success, message, data }
-  // Kembalikan keseluruhan response.data agar Calculator.jsx
-  // bisa mengakses results.data, results.message, dst.
-  return response.data;
+  const json = await response.json();
+  if (!response.ok) throw new Error(json.message || 'Gagal menghitung zonasi');
+
+  // Karena API kamu mengembalikan { success, message, data },
+  // kita kembalikan json-nya agar Calculator.jsx bisa mengakses results.data
+  return json;
 };
 
 /**
@@ -32,13 +36,20 @@ export const calculateZoning = async (payload) => {
  * Menghitung fitur kompetitor (Haversine) di backend lalu
  * meneruskannya ke Python ML service.
  * Mengembalikan { prediction, ai_recommendation } yang sudah dinormalisasi.
- * @param {Object} params - { latitude, longitude }
- * @returns {Promise<{ prediction: Object, ai_recommendation: Object|null }>}
  */
 export const predictAI = async ({ latitude, longitude }) => {
-  const response = await api.post('/ai/predict', { latitude, longitude });
+  const token = localStorage.getItem('token');
+  const response = await fetch(`${API_BASE_URL}/ai/predict`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ latitude, longitude }),
+  });
 
-  const json = response.data;
+  const json = await response.json();
+  if (!response.ok) throw new Error(json.message || 'Gagal melakukan prediksi AI');
 
   // json.data.prediction = objek dari Python ML service
   // { is_violation, verdict, confidence_percentage, ai_recommendation? }
@@ -54,3 +65,43 @@ export const predictAI = async ({ latitude, longitude }) => {
     ai_recommendation: aiRec,
   };
 };
+
+// // src/services/zoningApi.js
+
+// const API_BASE_URL =
+//   import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api/v1';
+
+// export const getZoningMapPoints = async () => {
+//   const response = await fetch(`${API_BASE_URL}/zoning/points`);
+
+//   const json = await response.json();
+
+//   if (!response.ok) {
+//     throw new Error(json.message || 'Gagal mengambil data peta');
+//   }
+
+//   return json.data;
+// };
+
+// export const calculateZoning = async ({ name, latitude, longitude, radiusMeters = 500 }) => {
+//   const response = await fetch(`${API_BASE_URL}/zoning/calculate`, {
+//     method: 'POST',
+//     headers: {
+//       'Content-Type': 'application/json',
+//     },
+//     body: JSON.stringify({
+//       name,
+//       latitude: Number(latitude),
+//       longitude: Number(longitude),
+//       radiusMeters: Number(radiusMeters),
+//     }),
+//   });
+
+//   const json = await response.json();
+
+//   if (!response.ok) {
+//     throw new Error(json.message || 'Gagal menghitung zonasi');
+//   }
+
+//   return json.data;
+// };
