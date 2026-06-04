@@ -26,7 +26,13 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 
 app.use(
   cors({
-    origin: ['http://localhost:5173', 'http://localhost:5174'],
+    origin: process.env.NODE_ENV === 'production' 
+      ? [
+          'https://zonify.vercel.app',
+          process.env.VITE_API_BASE_URL || '',
+          process.env.FRONTEND_URL || ''
+        ].filter(Boolean)
+      : ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:3001'],
     credentials: true,
   })
 );
@@ -82,11 +88,16 @@ app.use((err, req, res, next) => {
 });
 
 // ─── Start Server ───────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n Zonify API running at http://localhost:${PORT}`);
-  console.log(` API Base: http://localhost:${PORT}/api/v1`);
-  console.log(` Health:   http://localhost:${PORT}/api/v1/health`);
-  console.log(` Auth:     http://localhost:${PORT}/api/v1/auth`);
-  console.log(` AI:       http://localhost:${PORT}/api/v1/ai`);
-  console.log(` Test:     http://localhost:${PORT}/api/v1/test\n`);
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.listen(PORT, () => {
+    console.log(`\n Zonify API running at http://localhost:${PORT}`);
+    console.log(` API Base: http://localhost:${PORT}/api/v1`);
+    console.log(` Health:   http://localhost:${PORT}/api/v1/health`);
+    console.log(` Auth:     http://localhost:${PORT}/api/v1/auth`);
+    console.log(` AI:       http://localhost:${PORT}/api/v1/ai`);
+    console.log(` Test:     http://localhost:${PORT}/api/v1/test\n`);
+  });
+}
+
+// Export app untuk Vercel Serverless Function
+export default app;
