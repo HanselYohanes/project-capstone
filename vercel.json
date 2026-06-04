@@ -1,12 +1,16 @@
 {
   "version": 2,
-  "installCommand": "npm install --legacy-peer-deps && npm install --prefix apps/api --legacy-peer-deps && npm install --prefix apps/web --legacy-peer-deps --include=dev",
+  "installCommand": "npm install --legacy-peer-deps",
   "builds": [
     {
       "src": "apps/api/src/index.js",
       "use": "@vercel/node",
       "config": {
-        "includeFiles": ["apps/api/prisma/schema.prisma"]
+        "includeFiles": [
+          "apps/api/prisma/**",
+          "apps/api/src/**",
+          "apps/api/node_modules/.prisma/**"
+        ]
       }
     },
     {
